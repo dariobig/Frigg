@@ -1,5 +1,6 @@
 import {Uri, TextDocument, workspace, window} from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 
 export default class Params {
     private original: Uri;
@@ -14,8 +15,8 @@ export default class Params {
         return this.paramsMap; 
     }
 
-    public tryUpdateParams(): boolean {
-        let onDisk = this.loadParameters();
+    public tryUpdateParams(filePath: string): boolean {
+        let onDisk = this.loadParameters(filePath);
         if (!onDisk) {
             return false;
         }
@@ -24,23 +25,52 @@ export default class Params {
         return true;
     }
 
-    public saveParams(outputPath: string = ''): Uri {
-        var filePath = outputPath === '' ? this.parametersPath() : outputPath;
-        fs.writeFileSync(filePath, JSON.stringify(this.paramsMap, null, 2), 'utf8');
-        return Uri.file(filePath);
+    public saveParams(outputPath: string): Thenable<Uri> {
+        return new Promise((resolve, reject) => {
+            let json = JSON.stringify(this.paramsMap, null, 2);
+            return fs.writeFile(outputPath, json, {encoding: 'utf8'}, (err) => {
+                if (err !== undefined && err !== null) {
+                    window.showErrorMessage(`couldn't save parameters to "${outputPath}":\n${err}`);
+                    return reject(err);
+                }
+
+                return resolve(Uri.file(outputPath));
+            });
+        });
     }
 
-    public parametersPath(): string {
+    public defaultParametersPath(): string {
         return this.original.fsPath + '.json';
     }
 
-    private loadParameters(): ParamsMap | null {
-        let paramsFile = this.parametersPath();
+    public discoverParamatersFiles(): Thenable<string[]> {
+        let filePath = path.parse(this.defaultParametersPath());
+        let p: Thenable<string[]> = new Promise((resolve, reject) => {
+            return fs.readdir(filePath.dir, (err, files) => {
+                if (err !== undefined && err !== null) {
+                    return reject(err);
+                }
+
+                return resolve(files
+                    .filter(f => f !== filePath.name && f.startsWith(filePath.name))
+                    .map(f => path.join(filePath.dir, f)));
+            });
+        });
+        return p;
+    }
+
+    private loadParameters(paramsFile: string): ParamsMap | null {
         if (!fs.existsSync(paramsFile)) {
             return null;
         }
     
-        return <ParamsMap>JSON.parse(fs.readFileSync(paramsFile, 'utf8'));
+        try {
+            let paramsMap = JSON.parse(fs.readFileSync(paramsFile, 'utf8')) as ParamsMap;
+            return paramsMap;
+        } catch (e) {
+            window.showErrorMessage(`corrupted param file isn't json: ${paramsFile}`);
+            return null;
+        }
     }
 
     private getPattern(): RegExp {
@@ -68,18 +98,18 @@ export default class Params {
         var params: ParamsMap = { };
         var match;
         while (match = re.exec(content)) {
-            params[match[0]] = new Param(match[1], "", "");
+            params[match[0]] = new Param(match[1]);
         }
         return params;
     }
 }
 
 export class Param {
-    public name: string = "";
-    public value: string = "";
-    public type: string = "";
+    public name: string;
+    public value: string;
+    public type: string;
     
-    constructor(name: string, value: string, type: string) {
+    constructor(name: string, value: string = "", type: string = "") {
         this.name = name;
         this.value = value;
         this.type = type;
@@ -91,6 +121,34 @@ export class Param {
         }
         return p.value;
     }
+
+    public static wrap(obj: any|null|undefined): Param {
+        if (obj === null || obj === undefined || typeof(obj) !== 'object') {
+            return new Param('');
+        }
+
+        var p = obj as Param;
+        p.name = 'name' in p ? `${p.name}` : '';
+        p.value = 'value' in p ? `${p.value}` : '';
+        p.type = 'type' in p ? `${p.type}` : '';
+        return p;
+    }
+
+    public static isEmpty(p: Param): boolean {
+        return p.name === '' && p.value === '' && p.type === '';
+    }
+
+    public static merge(first: Param, second: Param): Param {
+        let merged: any = first;
+        let other: any = second;
+        for (let k in other) {
+            if (other[k] !== '' || !(k in merged)) {
+                merged[k] = other[k];
+            }
+        }
+
+        return merged as Param;
+    }
 }
 
 export interface ParamsMap {
@@ -98,10 +156,9 @@ export interface ParamsMap {
 }
 
 function mergeParams(original: ParamsMap, other: ParamsMap, deleteMissing: boolean = true): ParamsMap {
-    var merged: ParamsMap = {};
+    let merged: ParamsMap = {};
     for (let key in original) {
-        let v = other[key];
-        merged[key] = v ? v : original[key];
+        merged[key] = Param.merge(original[key], Param.wrap(other[key]));
     }
 
     if (!deleteMissing) {
@@ -111,5 +168,6 @@ function mergeParams(original: ParamsMap, other: ParamsMap, deleteMissing: boole
             }
         }    
     }
+
     return merged;
 }
