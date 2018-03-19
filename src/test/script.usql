@@ -1,0 +1,23 @@
+// Test script.
+USING System;
+USING System.Linq;
+
+@@ExtraClause@@
+
+@Input =
+    EXTRACT @@InputSchema@@
+    FROM @@Input@@
+    USING @@Extractor@@
+    ;
+
+@Out =
+    SELECT @@OutputColumns@@
+    FROM @Input
+    @@WhereClause@@
+    ;
+
+OUTPUT @Out
+TO @@Output@@
+@@OrderBy@@
+USING @@Outputter@@
+;

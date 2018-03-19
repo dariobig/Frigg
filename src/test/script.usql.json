@@ -1,0 +1,47 @@
+{
+  "@@ExtraClause@@": {
+    "name": "ExtraClause",
+    "value": "// NOTHING TO SEE",
+    "type": ""
+  },
+  "@@InputSchema@@": {
+    "name": "InputSchema",
+    "value": "A string, B int, C SqlMap<string, int>",
+    "type": ""
+  },
+  "@@Input@@": {
+    "name": "Input",
+    "value": "users/dariobig/test/input/{*}.tef",
+    "type": "string"
+  },
+  "@@Extractor@@": {
+    "name": "Extractor",
+    "value": "Extractors.Tsv()",
+    "type": ""
+  },
+  "@@OutputColumns@@": {
+    "name": "OutputColumns",
+    "value": "A, B, C",
+    "type": ""
+  },
+  "@@WhereClause@@": {
+    "name": "WhereClause",
+    "value": "WHERE TRUE",
+    "type": ""
+  },
+  "@@Output@@": {
+    "name": "Output",
+    "value": "users/dariobig/test/output/{*}.tef",
+    "type": "string"
+  },
+  "@@OrderBy@@": {
+    "name": "OrderBy",
+    "value": "",
+    "type": ""
+  },
+  "@@Outputter@@": {
+    "name": "Outputter",
+    "value": "Outputters.Tsv()",
+    "type": ""
+  }
+}

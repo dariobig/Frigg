@@ -1,0 +1,71 @@
+{
+    "name": "frigg",
+    "displayName": "FriGG",
+    "description": "Parmetrize your scripts via pre-processor replacement.",
+    "version": "0.0.1",
+    "publisher": "bigonazzi",
+    "engines": {
+        "vscode": "^1.21.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:extension.replaceParameters"
+    ],
+    "main": "./out/extension",
+    "contributes": {
+        "configuration": {
+            "type": "object",
+            "title": "FriGG",
+            "properties": {
+                "frigg.parameterPattern": {
+                    "scope": "resource",
+                    "type": "string",
+                    "default": "@@[^@\\s]+@@",
+                    "description": "The pattern of params to replace."
+                },
+                "frigg.deleteMissingParams": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "If true automatically deletes outdated parameters from the value file."
+                }
+            }
+        },
+        "commands": [
+            {
+                "command": "extension.replaceParameters",
+                "title": "Replace script parameters",
+                "category": "FriGG"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "command": "extension.replaceParameters",
+                    "category": "FriGG"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+    },
+    "devDependencies": {
+        "typescript": "^2.6.1",
+        "vscode": "^1.1.6",
+        "tslint": "^5.8.0",
+        "@types/node": "^7.0.43",
+        "@types/mocha": "^2.2.42"
+    },
+    "dependencies": {},
+    "repository": {
+        "type": "git",
+        "url": "https://bigonazzi.visualstudio.com/_git/FriGG"
+      }
+}
