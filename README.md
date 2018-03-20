@@ -1,15 +1,9 @@
 # FriGG README
 
-Replace parameters in template scripts. Specify a custom paramter pattern or use the default @@<PARAMETER_NAME>@@. 
-Parameter values are stored in a separate json file.
+Replace parameters in template scripts. Specify a custom paramter pattern or use the default @@<PARAMETER_NAME>@@.
+Parameter values are stored in a separate json file. If a parameter file is missing a new one will be created with values found in the original file. Once a parameter file is present it will be used to replace values:
 
-If a parameter file is missing a new one will be created with values found in the original file:
-
-![Parameters discovery](resources/parameter_discovery.gif)
-
-Once a parameter file is present it will be used to replace values:
-
-![Replace parameters](resources/parameter_replacement.gif)
+![Parameters discovery](resources/frigg_replacement_demo.gif)
 
 Any new parameter added to the original file will be automatically added to the value file as an empty parameter.
 
@@ -35,6 +29,10 @@ This extension contributes the following settings:
 Not yet :)
 
 ## Release Notes
+
+### 0.0.2
+
+Bug fixes
 
 ### 0.0.1
 
