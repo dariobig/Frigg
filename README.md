@@ -9,6 +9,8 @@ Any new parameter added to the original file will be automatically added to the 
 
 Parameter of type string will be automatically wrapped in double quotes, no escaping will be done, so you'll need to handle quoting on your end.
 
+Json files in the same directory and starting with the same name as the original file will be automatically suggested as possible parameter files. Selected parameter files might be overwritte if their content isn't of the right format or there's a content mismatch with the script's parameters.
+
 ## Features
 
 - replace parameters in template files
