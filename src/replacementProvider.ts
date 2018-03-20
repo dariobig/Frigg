@@ -2,22 +2,23 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import {ParamsMap, Param} from './params';
+import Params, {ParamsMap, Param} from './params';
 
 export default class ReplacementProvider implements vscode.TextDocumentContentProvider {
     static scheme = 'frigg';
 
     public provideTextDocumentContent(uri: vscode.Uri): string {
-        let paramsMap = decodeParams(uri);
-        return this.replaceParams(uri.path, paramsMap);
+        let [paramsMap, paramsFile] = decodeParams(uri);
+        return this.replaceParams(uri.path, paramsFile, paramsMap);
     }
 
-    static getUri(original: vscode.Uri, paramsMap: ParamsMap): vscode.Uri {
-        const query = JSON.stringify(JSON.stringify(paramsMap));
-        return vscode.Uri.parse(`${ReplacementProvider.scheme}:${localScriptPath(original)}?${query}`);
+    static getUri(params: Params): vscode.Uri {
+        const query = JSON.stringify([JSON.stringify(params.getParams()), 
+                                      params.lastParamFile !== null ? params.lastParamFile : '']);
+        return vscode.Uri.parse(`${ReplacementProvider.scheme}:${localScriptPath(params.original)}?${query}`);
     }
 
-    private replaceParams(original: string, paramsMap: ParamsMap): string {
+    private replaceParams(original: string, paramsFile: string|null, paramsMap: ParamsMap): string {
         let editor = vscode.window.activeTextEditor;
         if (editor === undefined) {
             return "// ERROR: No active editor found!";
@@ -25,6 +26,11 @@ export default class ReplacementProvider implements vscode.TextDocumentContentPr
 
         var replaced = editor.document.getText();
         var header = `// REPLACED: ${original}\n`;
+        
+        if (paramsFile !== null) {
+            header += `// PARAMS: ${paramsFile}\n`;
+        }
+
         for (let key in paramsMap) {
             let value = Param.getValue(paramsMap[key]);
             header += `// ${key}: ${value === '' ? '-- NOTHING --' : value}\n`;
@@ -35,8 +41,9 @@ export default class ReplacementProvider implements vscode.TextDocumentContentPr
     }
 }
 
-function decodeParams(uri: vscode.Uri): ParamsMap {
-    return <ParamsMap>JSON.parse(<string>JSON.parse(uri.query));
+function decodeParams(uri: vscode.Uri): [ParamsMap, string|null] {
+    let [mapStr, paramsFile] = JSON.parse(uri.query) as [string, string];
+    return [JSON.parse(mapStr), paramsFile === '' ? null : paramsFile];
 }
 
 function localScriptPath(original: vscode.Uri): string {

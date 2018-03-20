@@ -3,7 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export default class Params {
-    private original: Uri;
+    original: Uri;
+    lastParamFile: string | null = null;
     private paramsMap: ParamsMap;
 
     constructor(doc: TextDocument) {
@@ -21,6 +22,7 @@ export default class Params {
             return false;
         }
 
+        this.lastParamFile = filePath;
         this.paramsMap = mergeParams(this.paramsMap, onDisk, this.getDeleteMissingParams());
         return true;
     }
@@ -34,6 +36,7 @@ export default class Params {
                     return reject(err);
                 }
 
+                this.lastParamFile = outputPath;
                 return resolve(Uri.file(outputPath));
             });
         });
@@ -45,7 +48,7 @@ export default class Params {
 
     public discoverParamatersFiles(): Thenable<string[]> {
         let filePath = path.parse(this.defaultParametersPath());
-        let p: Thenable<string[]> = new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             return fs.readdir(filePath.dir, (err, files) => {
                 if (err !== undefined && err !== null) {
                     return reject(err);
@@ -56,7 +59,6 @@ export default class Params {
                     .map(f => path.join(filePath.dir, f)));
             });
         });
-        return p;
     }
 
     private loadParameters(paramsFile: string): ParamsMap | null {

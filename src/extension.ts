@@ -1,6 +1,6 @@
 'use strict';
 
-import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, OpenDialogOptions, Uri} from 'vscode';
+import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, SaveDialogOptions} from 'vscode';
 import Params from './params';
 import ReplacementProvider from './replacementProvider';
 
@@ -13,22 +13,26 @@ export function activate(context: ExtensionContext) {
     );
 
     const replaceAEtherParams = commands.registerTextEditorCommand('extension.replaceParameters', editor => {
-        let uri = editor.document.uri;
-        var params = new Params(editor.document);
+        let docUri = editor.document.uri;
+        // TODO: async
+        let params = new Params(editor.document);
 
-        // ask for parameter file
-        // load and merge params
-        // save back to file
-        askForFile(params.discoverParamatersFiles(), "select or type a parameter file ... ").then((selected) => {
-            if (selected !== undefined) {
-                if (!params.tryUpdateParams(selected)) {
-                    window.showInformationMessage(`Generating parameter value file from ${selected}\nPlease add any replacement to the value file.`);
-                    params.saveParams(selected).then(uri => workspace.openTextDocument(uri)).then(doc => window.showTextDocument(doc));
-                } else {
-                    params.saveParams(params.defaultParametersPath());
-                    const replacementUri = ReplacementProvider.getUri(uri, params.getParams());
-                    workspace.openTextDocument(replacementUri).then(doc => window.showTextDocument(doc));
-                }
+        askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles()).then((selected) => {
+            if (selected === undefined) {
+                return;
+            }
+            
+            if (!params.tryUpdateParams(selected)) {
+                window.showInformationMessage(`Generating parameter value file from ${selected}\n`+
+                                              'Please add any replacement to the value file.');
+                params.saveParams(selected).then(p => {
+                    setDefaultParamsFile(docUri, p.fsPath);
+                    return workspace.openTextDocument(p);
+                }).then(doc => window.showTextDocument(doc), err => window.showErrorMessage(err));
+            } else {
+                params.saveParams(selected).then(p => setDefaultParamsFile(docUri, p.fsPath), err => window.showErrorMessage(err));
+                const replacementUri = ReplacementProvider.getUri(params);
+                workspace.openTextDocument(replacementUri).then(doc => window.showTextDocument(doc), err => window.showErrorMessage(err));
             }
         });
     });
@@ -39,27 +43,39 @@ export function activate(context: ExtensionContext) {
     );
 }
 
-function askForFile(files: Thenable<string[]>, placeHolder: string = 'select / type a filename ...'): Thenable<string|undefined> {
-    let qpo: QuickPickOptions = {  
+const _paramsFiles = new Map<string, string>();
+
+function getDefaultParamsFile(params: Params): string {
+    let d = _paramsFiles.get(params.original.toString());
+    return d === undefined ? params.defaultParametersPath() : d;
+}
+
+function setDefaultParamsFile(uri: Uri, paramsFilePath: string) {
+    _paramsFiles.set(uri.toString(), paramsFilePath);
+}
+
+function askForFile(defaultFile: string, 
+                    files: Thenable<string[]>,
+                    placeHolder: string = 'select a replacement file ...'): Thenable<string|undefined> {
+    
+    let qpo: QuickPickOptions = {
         placeHolder: placeHolder,
         matchOnDescription: true,
     };
     
-    let shouldOpenDialog = 'or pick a file ...';
-    let options = files.then((files) => files.concat([shouldOpenDialog]));
+    let shouldOpenDialog = 'create a new file ...';
+    let options = files.then((files) => {
+        files = files.filter(f => f !== defaultFile).concat([shouldOpenDialog]);
+        return defaultFile === null ? files : [defaultFile].concat(files);
+    });
 
     return window.showQuickPick(options, qpo).then(function (selected): Thenable<string|undefined> {
         if (selected && selected !== undefined) {
             if (selected === shouldOpenDialog) {
-                let odo: OpenDialogOptions = {
-                    canSelectFolders: false,
-                    canSelectFiles: true,
-                    canSelectMany: false
-                };
-
-                return window.showOpenDialog(odo).then((selected: Uri[] | undefined) => {
-                    if (selected !== undefined && selected.length > 0) {
-                        return selected[0].fsPath;
+                let sdo: SaveDialogOptions = { defaultUri: Uri.file(defaultFile) };
+                return window.showSaveDialog(sdo).then((selected: Uri | undefined) => {
+                    if (selected !== undefined) {
+                        return selected.fsPath;
                     }
                 });
             } else {
@@ -72,4 +88,5 @@ function askForFile(files: Thenable<string[]>, placeHolder: string = 'select / t
 
 // this method is called when your extension is deactivated
 export function deactivate() {
+    _paramsFiles.clear();
 }
