@@ -1,8 +1,9 @@
 'use strict';
 
-import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, SaveDialogOptions} from 'vscode';
+import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, SaveDialogOptions, TextDocument} from 'vscode';
 import Params from './params';
 import ReplacementProvider from './replacementProvider';
+import * as fs from 'fs';
 
 export function activate(context: ExtensionContext) {
 
@@ -12,34 +13,18 @@ export function activate(context: ExtensionContext) {
         workspace.registerTextDocumentContentProvider(ReplacementProvider.scheme, replacementProvider)
     );
 
-    const replaceAEtherParams = commands.registerTextEditorCommand('extension.replaceParameters', editor => {
-        let docUri = editor.document.uri;
-        // TODO: async
-        let params = new Params(editor.document);
+    const replaceParamsCmd = commands.registerTextEditorCommand('extension.replaceParameters', editor => {
+        replaceParams(editor.document);
+    });
 
-        askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles()).then((selected) => {
-            if (selected === undefined) {
-                return;
-            }
-            
-            if (!params.tryUpdateParams(selected)) {
-                window.showInformationMessage(`Generating parameter value file from ${selected}\n`+
-                                              'Please add any replacement to the value file.');
-                params.saveParams(selected).then(p => {
-                    setDefaultParamsFile(docUri, p.fsPath);
-                    return workspace.openTextDocument(p);
-                }).then(doc => window.showTextDocument(doc), err => window.showErrorMessage(err));
-            } else {
-                params.saveParams(selected).then(p => setDefaultParamsFile(docUri, p.fsPath), err => window.showErrorMessage(err));
-                const replacementUri = ReplacementProvider.getUri(params);
-                workspace.openTextDocument(replacementUri).then(doc => window.showTextDocument(doc), err => window.showErrorMessage(err));
-            }
-        });
+    const replaceParamsToFileCmd = commands.registerTextEditorCommand('extension.replaceParamsToFile', editor => {
+        replaceParams(editor.document, false);
     });
 
     context.subscriptions.push(
         providerRegistrations,
-        replaceAEtherParams,
+        replaceParamsCmd,
+        replaceParamsToFileCmd
     );
 }
 
@@ -54,8 +39,54 @@ function setDefaultParamsFile(uri: Uri, paramsFilePath: string) {
     _paramsFiles.set(uri.toString(), paramsFilePath);
 }
 
+function replaceParams(original: TextDocument, readOnly: boolean = true) {
+    let params = new Params(original);
+    askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles()).then((selected) => {
+        if (selected === undefined) {
+            return;
+        }
+        
+        if (!params.tryUpdateParams(selected)) {
+            window.showInformationMessage(`Generating parameter value file from ${selected}\n`+
+                                          'Please add any replacement to the value file.');
+            params.saveParams(selected).then(p => {
+                setDefaultParamsFile(original.uri, p.fsPath);
+                return workspace.openTextDocument(p);
+            }).then(doc => window.showTextDocument(doc), err => window.showErrorMessage(err));
+        } else {
+            params.saveParams(selected).then(p => setDefaultParamsFile(original.uri, p.fsPath), err => window.showErrorMessage(err));
+            const replacementUri = ReplacementProvider.getUri(params);
+
+            if (readOnly) {
+                workspace.openTextDocument(replacementUri).then(doc => window.showTextDocument(doc), err => window.showErrorMessage(err));
+            } else {
+                workspace.openTextDocument(replacementUri).then(doc => {
+                    if (doc === undefined || doc === null) {
+                        window.showErrorMessage('error replacing document!');
+                        return;
+                    }
+
+                    askForFile(doc.uri.fsPath, null, 'save replaced file to ...').then(selected => {
+                        if (selected === undefined || selected === null) {
+                            return;
+                        }
+
+                        return fs.writeFile(selected, doc.getText(), 'utf8', (err) => {
+                            if (err !== null) {
+                                window.showErrorMessage(`Error writing ${selected}: ${err}`);
+                            } else {
+                                window.showTextDocument(Uri.file(selected));
+                            }
+                        });}, 
+                        err => window.showErrorMessage(err));
+                    });
+            }
+        }
+    });
+}
+
 function askForFile(defaultFile: string, 
-                    files: Thenable<string[]>,
+                    files: Thenable<string[]> | null = null,
                     placeHolder: string = 'select a replacement file ...'): Thenable<string|undefined> {
     
     let qpo: QuickPickOptions = {
@@ -64,10 +95,15 @@ function askForFile(defaultFile: string,
     };
     
     let shouldOpenDialog = 'create a new file ...';
-    let options = files.then((files) => {
-        files = files.filter(f => f !== defaultFile).concat([shouldOpenDialog]);
-        return defaultFile === null ? files : [defaultFile].concat(files);
-    });
+    let options: Thenable<string[]> | string[];
+    if (files === null) {
+        options = defaultFile === null ? [shouldOpenDialog] : [defaultFile, shouldOpenDialog];
+    } else {
+        options = files.then((files) => {
+            files = files.filter(f => f !== defaultFile).concat([shouldOpenDialog]);
+            return defaultFile === null ? files : [defaultFile].concat(files);
+        });
+    }
 
     return window.showQuickPick(options, qpo).then(function (selected): Thenable<string|undefined> {
         if (selected && selected !== undefined) {
