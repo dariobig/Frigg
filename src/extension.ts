@@ -41,7 +41,7 @@ function setDefaultParamsFile(uri: Uri, paramsFilePath: string) {
 
 function replaceParams(original: TextDocument, readOnly: boolean = true) {
     let params = new Params(original);
-    askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles()).then((selected) => {
+    askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles(), 'select a parameter file to use / create ...').then((selected) => {
         if (selected === undefined) {
             return;
         }
@@ -86,15 +86,15 @@ function replaceParams(original: TextDocument, readOnly: boolean = true) {
 }
 
 function askForFile(defaultFile: string, 
-                    files: Thenable<string[]> | null = null,
-                    placeHolder: string = 'select a replacement file ...'): Thenable<string|undefined> {
+                    files: Thenable<string[]> | null,
+                    placeHolder: string): Thenable<string|undefined> {
     
     let qpo: QuickPickOptions = {
         placeHolder: placeHolder,
         matchOnDescription: true,
     };
     
-    let shouldOpenDialog = 'create a new file ...';
+    let shouldOpenDialog = 'pick a file ...';
     let options: Thenable<string[]> | string[];
     if (files === null) {
         options = defaultFile === null ? [shouldOpenDialog] : [defaultFile, shouldOpenDialog];
