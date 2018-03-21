@@ -12,7 +12,7 @@ export default class Params {
         this.paramsMap = this.findParams(doc.getText());
     }
 
-    public getParams(): ParamsMap { 
+    public getParams(): ParamsMap {
         return this.paramsMap; 
     }
 
