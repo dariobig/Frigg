@@ -11,7 +11,9 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.replaceParameters"
+        "onCommand:extension.replaceParameters",
+        "onCommand:extension.replaceParamsToFile",
+        "onCommand:extension.buildCommandFromParams"
     ],
     "main": "./out/extension",
     "contributes": {
@@ -22,7 +24,7 @@
                 "frigg.parameterPattern": {
                     "scope": "resource",
                     "type": "string",
-                    "default": "@@[^@\\s]+@@",
+                    "default": "@@([^@\\s]+)@@",
                     "description": "The pattern of params to replace."
                 },
                 "frigg.deleteMissingParams": {
@@ -43,6 +45,11 @@
                 "command": "extension.replaceParamsToFile",
                 "title": "Replace scripts parameters to file",
                 "category": "FriGG"
+            },
+            {
+                "command": "extension.buildCommandFromParams",
+                "title": "Builds command string from parameter files using a rule file",
+                "category": "FriGG"
             }
         ],
         "menus": {
@@ -54,6 +61,11 @@
                 {
                     "command": "extension.replaceParamsToFile",
                     "category": "FriGG"
+                },
+                {
+                    "command": "extension.buildCommandFromParams",
+                    "category": "FriGG",
+                    "when": "resourceLangId == json"
                 }
             ]
         }
@@ -72,7 +84,9 @@
         "@types/node": "^7.0.43",
         "@types/mocha": "^2.2.42"
     },
-    "dependencies": {},
+    "dependencies": {
+        "npm": "^5.7.1"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/bigonazzi/Frigg.git"

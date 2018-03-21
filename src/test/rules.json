@@ -1,0 +1,9 @@
+{
+    "Template": "UsqlScript ScriptName=(ScriptName:default,Idf.usql) AnalyticsAccountName=matrixadlaprod @@PARAMS@@",
+    "Rules": [
+        {"TypePattern": "string", "NamePattern": "(Input)([^@]*)", "Format": "PATHIN_${name[2]}={in:EncryptedAzureBlobPath:${name[2]}}"},
+        {"TypePattern": "string", "NamePattern": "(Output)([^@]*)", "Format": "OutputReferenceEncrypted_${name[2]}={out:AzureBlobPath:${name[2]}}"},
+        {"TypePattern": "int", "NamePattern": "(.*)", "Format": "PARAM_${name[1]}=[(${name[1]}:int,,${value !== '' ? ':default,' + value : ''})]"},
+        {"TypePattern": "", "NamePattern": "(.*)", "Format": "PARAM_${name[1]}=\"[(${name[1]})]\""}
+    ]
+}

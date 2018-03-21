@@ -17,7 +17,7 @@ export default class Params {
     }
 
     public tryUpdateParams(filePath: string): boolean {
-        let onDisk = this.loadParameters(filePath);
+        let onDisk = Params.loadParameters(filePath);
         if (!onDisk) {
             return false;
         }
@@ -61,19 +61,28 @@ export default class Params {
         });
     }
 
-    private loadParameters(paramsFile: string): ParamsMap | null {
+    static loadParameters(paramsFile: string): ParamsMap | null {
         if (!fs.existsSync(paramsFile)) {
             return null;
         }
     
+        let paramsMap = Params.parseParameters(fs.readFileSync(paramsFile, 'utf8'));
+        if (paramsMap === null) {
+            window.showErrorMessage(`corrupted param file: ${paramsFile}`);
+        }
+        return paramsMap;
+    }
+
+    static parseParameters(content: string): ParamsMap | null {
         try {
-            let paramsMap = JSON.parse(fs.readFileSync(paramsFile, 'utf8')) as ParamsMap;
+            let paramsMap = <ParamsMap>JSON.parse(content);
             return paramsMap;
         } catch (e) {
-            window.showErrorMessage(`corrupted param file isn't json: ${paramsFile}`);
             return null;
         }
     }
+
+
 
     private getPattern(): RegExp {
         var fromSettings: string | undefined = workspace.getConfiguration('frigg', null).get('parameterPattern');
@@ -85,7 +94,7 @@ export default class Params {
             }
         }
 
-        var pattern = '@@[^@\\s+]@@';
+        var pattern = '@@([^@\\s+])@@';
         window.showErrorMessage(`can't find frigg.parameterPattern, using default pattern: ${pattern}`);
         return new RegExp(pattern, 'g');
     }
@@ -100,8 +109,9 @@ export default class Params {
         var params: ParamsMap = { };
         var match;
         while (match = re.exec(content)) {
-            params[match[0]] = new Param(match[1]);
+            params[match[0]] = new Param(match.length > 1 ? match[1] : match[0]);
         }
+
         return params;
     }
 }
@@ -118,10 +128,7 @@ export class Param {
     }
 
     public static getValue(p: Param): string {
-        if (p.type.toLowerCase() === "string") {
-            return `"${p.value}"`;
-        }
-        return p.value;
+        return p.type.toLowerCase() === "string" ? JSON.stringify(p.value) : p.value;
     }
 
     public static wrap(obj: any|null|undefined): Param {

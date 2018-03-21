@@ -21,10 +21,20 @@ export function activate(context: ExtensionContext) {
         replaceParams(editor.document, false);
     });
 
+    const buildCommandFromParams = commands.registerTextEditorCommand('extension.buildCommandFromParams', editor => {
+        let paramsMap = Params.parseParameters(editor.document.getText());
+        if (paramsMap === null) {
+            window.showErrorMessage('not a valid parameter file');
+        } else {
+            window.showInformationMessage(paramsMap.toString());
+        }
+    });
+
     context.subscriptions.push(
         providerRegistrations,
         replaceParamsCmd,
-        replaceParamsToFileCmd
+        replaceParamsToFileCmd,
+        buildCommandFromParams
     );
 }
 
@@ -118,7 +128,7 @@ function askForFile(defaultFile: string,
                 return new Promise((resolve, reject) => resolve(selected));
             }
         }
-        return new Promise((resolve, reject) => reject(selected));
+        return new Promise((resolve, reject) => reject());
     });
 }
 
