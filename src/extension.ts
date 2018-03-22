@@ -24,7 +24,7 @@ export function activate(context: ExtensionContext) {
         replaceParams(editor.document, nextColumn(editor), false);
     });
 
-    const buildCommandFromParamsCmd = commands.registerTextEditorCommand('extension.buildCommandFromParams', editor => {
+    const generateScriptFromParamsCmd = commands.registerTextEditorCommand('extension.generateScriptFromParams', editor => {
         let paramsMap = validateParamsMap(Params.parseParameters(editor.document.getText()));
         if (paramsMap === null) {
             window.showErrorMessage('not a valid parameter file');
@@ -93,7 +93,7 @@ export function activate(context: ExtensionContext) {
         providerRegistrations,
         replaceParamsCmd,
         replaceParamsToFileCmd,
-        buildCommandFromParamsCmd
+        generateScriptFromParamsCmd
     );
 }
 

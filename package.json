@@ -13,7 +13,7 @@
     "activationEvents": [
         "onCommand:extension.replaceParameters",
         "onCommand:extension.replaceParamsToFile",
-        "onCommand:extension.buildCommandFromParams"
+        "onCommand:extension.generateScriptFromParams"
     ],
     "main": "./out/extension",
     "contributes": {
@@ -43,12 +43,12 @@
             },
             {
                 "command": "extension.replaceParamsToFile",
-                "title": "Replace scripts parameters to file",
+                "title": "Replace scripts parameters (save to file)",
                 "category": "FriGG"
             },
             {
-                "command": "extension.buildCommandFromParams",
-                "title": "Builds command string from parameter files using a rule file",
+                "command": "extension.generateScriptFromParams",
+                "title": "Generate script using a template file",
                 "category": "FriGG"
             }
         ],
@@ -63,7 +63,7 @@
                     "category": "FriGG"
                 },
                 {
-                    "command": "extension.buildCommandFromParams",
+                    "command": "extension.generateScriptFromParams",
                     "category": "FriGG",
                     "when": "resourceLangId == json"
                 }
