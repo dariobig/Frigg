@@ -2,7 +2,7 @@
     "name": "frigg",
     "displayName": "FriGG",
     "description": "Parmetrize your scripts via pre-processor replacement.",
-    "version": "0.0.3",
+    "version": "0.1.0",
     "publisher": "bigonazzi",
     "engines": {
         "vscode": "^1.21.0"
