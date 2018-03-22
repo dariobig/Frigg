@@ -1,4 +1,5 @@
 import {Uri, TextDocument, workspace, window} from 'vscode';
+import {validate} from './utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -61,6 +62,7 @@ export default class Params {
         });
     }
 
+
     static loadParameters(paramsFile: string): ParamsMap | null {
         if (!fs.existsSync(paramsFile)) {
             return null;
@@ -70,6 +72,7 @@ export default class Params {
         if (paramsMap === null) {
             window.showErrorMessage(`corrupted param file: ${paramsFile}`);
         }
+        
         return paramsMap;
     }
 
@@ -81,8 +84,6 @@ export default class Params {
             return null;
         }
     }
-
-
 
     private getPattern(): RegExp {
         var fromSettings: string | undefined = workspace.getConfiguration('frigg', null).get('parameterPattern');
@@ -121,7 +122,7 @@ export class Param {
     public value: string;
     public type: string;
     
-    constructor(name: string, value: string = "", type: string = "") {
+    constructor(name: string = '', value: string = '', type: string = '') {
         this.name = name;
         this.value = value;
         this.type = type;
@@ -136,11 +137,19 @@ export class Param {
             return new Param('');
         }
 
-        var p = obj as Param;
-        p.name = 'name' in p ? `${p.name}` : '';
-        p.value = 'value' in p ? `${p.value}` : '';
-        p.type = 'type' in p ? `${p.type}` : '';
-        return p;
+        for (let k in Param.defaultParam) {
+            if (k in obj && typeof obj[k] === 'string') {
+                obj[k] = '';
+            }
+        }
+
+        return obj as Param;
+    }
+
+    static defaultParam: Param = new Param();
+
+    public static validate(obj: any|null|undefined): Param|null {
+        return validate(obj, Param.defaultParam);
     }
 
     public static isEmpty(p: Param): boolean {
@@ -161,7 +170,23 @@ export class Param {
 }
 
 export interface ParamsMap {
-    [email: string]: Param;
+    [path: string]: Param;
+}
+
+export function validateParamsMap(obj: any): ParamsMap | null {
+    if (obj === null || obj === undefined || typeof(obj) !== 'object') {
+        return null;
+    }
+
+    for (let k in obj) {
+        let valid = Param.validate(obj[k]);
+        if (valid === null) {
+            return null;
+        }
+        obj[k] = valid;
+    }
+
+    return obj as ParamsMap;
 }
 
 function mergeParams(original: ParamsMap, other: ParamsMap, deleteMissing: boolean = true): ParamsMap {

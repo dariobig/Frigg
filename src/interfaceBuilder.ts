@@ -1,5 +1,6 @@
 import * as ts from 'typescript';
-import {Param} from './params';
+import {Param, ParamsMap} from './params';
+import {validate} from './utils';
 
 // let configStr: string = `{
 //     "Template": "UsqlScript ScriptName=(ScriptName:default,Idf.usql) AnalyticsAccountName=matrixadlaprod @@PARAMS@@",
@@ -15,31 +16,24 @@ import {Param} from './params';
 // console.log(InterfaceBuilder.build(configStr, parameters));
 
 export default class InterfaceBuilder {
-    private _compiledRules: CompiledRule[] = [];
-    private _config: Config = {} as Config;
+    private _compiledRules: CompiledRule[];
+    private _config: Config;
 
-    constructor(json: string|null) {
-        if (json === null) {
-            return;
-        }
-
-        this._config = JSON.parse(json) as Config;
-        this._compiledRules = [];
-        for (let i = 0; i < this._config.Rules.length; i++) {
-            let r = this._config.Rules[i];
-            this._compiledRules.push(new CompiledRule(r));
-        }
+    constructor(config: Config, compiledRules: CompiledRule[]) {
+        this._config = config;
+        this._compiledRules = compiledRules;
     }
 
-    toString(params: Param[]): string {
+    toString(paramsMap: ParamsMap): string {
         let paramStrings: string[] = [];
-        for (let i = 0; i < params.length; i++) {
-            let p: Param = params[i];
+        
+        for (let k in paramsMap) {
+            let p: Param = paramsMap[k];
             let bestRule : CompiledRule | null = null;
             let bestMatch: number = 0;
 
-            for (let j = 0; j < this._compiledRules.length; j++) {
-                let cr: CompiledRule = this._compiledRules[j];
+            for (let i = 0; i < this._compiledRules.length; i++) {
+                let cr: CompiledRule = this._compiledRules[i];
                 let n = cr.matchParam(p);
                 if (n > bestMatch) {
                     bestMatch = n;
@@ -54,21 +48,69 @@ export default class InterfaceBuilder {
         return this._config.Template.replace('@@PARAMS@@', paramStrings.join(' '));
     }
 
-    static build(jsonConfig: string, params: Param[]): string {
-        let b = new InterfaceBuilder(jsonConfig);
-        return b.toString(params);
+    static fromJsonConfig(json: string): InterfaceBuilder | null {
+        if (json === null) {
+            return null;
+        }
+
+        let config = Config.validate(JSON.parse(json));
+        if (config === null) {
+            return null;
+        }
+
+        let compiledRules: CompiledRule[] = [];
+        for (let i = 0; i < config.Rules.length; i++) {
+            compiledRules.push(new CompiledRule(config.Rules[i]));
+        }
+
+        return new InterfaceBuilder(config, compiledRules);
+    }
+
+    static build(jsonConfig: string, paramsMap: ParamsMap): string|null {
+        let b = InterfaceBuilder.fromJsonConfig(jsonConfig);
+        return b === null ? null : b.toString(paramsMap);
     }
 }
 
 class Rule {
-    TypePattern: string = "";
-    NamePattern: string = "";
-    Format: string = "";
+    typePattern: string = "";
+    namePattern: string = "";
+    format: string = "";
+
+    constructor(typePattern: string = '', namePattern: string = '', format: string = '') {
+        this.typePattern = typePattern;
+        this.namePattern = namePattern;
+        this.format = format;
+    }
+
+    private static defaultRule: any = new Rule();
+
+    public static validate(obj: any): Rule | null {
+        return validate<Rule>(obj, Rule.defaultRule);
+    }
 }
 
 class Config {
     Template: string = "";
     Rules: Rule[] = [];
+
+    private static defaultConfig: Config = {Template: '', Rules: []};
+
+    static validate(obj: any): Config | null {
+        let config: Config | null = validate(obj, Config.defaultConfig);
+        if (config === null) {
+            return null;
+        }
+
+        for (let i = 0; i < config.Rules.length; i++) {
+            let rule = Rule.validate(config.Rules[i]);
+            if (rule === null) {
+                return null;
+            }
+        }
+
+        return config as Config;
+    }
 }
 
 class CompiledRule extends Rule {
@@ -77,11 +119,11 @@ class CompiledRule extends Rule {
 
     constructor(rule: Rule) {
         super();
-        this.Format = rule.Format;
-        this.NamePattern = rule.NamePattern;
-        this.TypePattern = rule.TypePattern;
-        this._typeRe = this.TypePattern !== "" ? new RegExp(this.TypePattern) : null;
-        this._nameRe = this.NamePattern !== "" ? new RegExp(this.NamePattern) : null;
+        this.format = rule.format;
+        this.namePattern = rule.namePattern;
+        this.typePattern = rule.typePattern;
+        this._typeRe = this.typePattern !== "" ? new RegExp(this.typePattern) : null;
+        this._nameRe = this.namePattern !== "" ? new RegExp(this.namePattern) : null;
     }
 
     matchParam(p: Param): number {
@@ -111,7 +153,7 @@ class CompiledRule extends Rule {
     }
 
     private compileRule(): any {
-        let replaced = CompiledRule.wrapper.replace('@@RULE@@', this.Format);
+        let replaced = CompiledRule.wrapper.replace('@@RULE@@', this.format);
         let tt = ts.transpile(replaced);
         return eval(tt);
     }
