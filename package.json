@@ -2,7 +2,7 @@
     "name": "frigg",
     "displayName": "FriGG",
     "description": "Parmetrize your scripts via pre-processor replacement.",
-    "version": "0.1.2",
+    "version": "0.1.1",
     "publisher": "bigonazzi",
     "license": "Apache-2.0",
     "engines": {
@@ -38,7 +38,7 @@
                 "frigg.templatesUrl": {
                     "scope": "resource",
                     "type": "string",
-                    "default": "https://github.com/bigonazzi/Frigg/tree/master/src/templates",
+                    "default": "https://github.com/bigonazzi/Frigg/tree/master/templates",
                     "description": "FriGG will download default templates from this github page."
                 },
                 "frigg.deleteMissingParams": {
