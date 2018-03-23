@@ -9,6 +9,10 @@ import ReplacementProvider from './replacementProvider';
 import InterfaceBuilder from './interfaceBuilder';
 import {mkDirRecursive} from './utils';
 
+const request = require('request');
+const cheerio = require('cheerio');
+
+// const template = require('test/rules.json');
 
 export function activate(context: ExtensionContext) {
 
@@ -24,6 +28,44 @@ export function activate(context: ExtensionContext) {
 
     const replaceParamsToFileCmd = commands.registerTextEditorCommand('extension.replaceParamsToFile', editor => {
         replaceParams(editor.document, nextColumn(editor), false);
+    });
+
+    const getTemplateCmd = commands.registerTextEditorCommand('extension.getTemplate', editor => {
+        let column = nextColumn(editor);
+        window.showQuickPick(getTemplateUrls(), { placeHolder: 'pick a template to download'}).then(selected => {
+            if (selected === undefined) {
+                return;
+            }
+
+            request(selected, function (error: any | null, response: any|null, body: any|null) {
+                if (error !== null) {
+                    window.showErrorMessage(`can't fetch template ${selected}: ${error}`);
+                    return;
+                }
+    
+                if (response === null || response.statusCode !== 200) {
+                    window.showErrorMessage(`can't get template ${selected} returned ${response === null ? 'NULL' : `status: ${response.statusCode}`}`);
+                    return;
+                }
+                
+                let fileName = /[^\/]+$/.exec(selected);
+                let fileUri = fileName !== null ? Uri.file(path.join('.', fileName[0])) : undefined;
+
+                window.showSaveDialog({saveLabel: 'save template file', defaultUri: fileUri }).then(saveTo => {
+                    if (saveTo === undefined) {
+                        return;
+                    }
+
+                    fs.writeFile(saveTo.fsPath, body, 'utf8', err => {
+                        if (err !== null) {
+                            window.showErrorMessage(`can't write template file ${saveTo}: ${err}`);
+                        }
+
+                        workspace.openTextDocument(saveTo).then(doc => window.showTextDocument(doc, column));
+                    });
+                });
+            });
+        });
     });
 
     const generateScriptFromParamsCmd = commands.registerTextEditorCommand('extension.generateScriptFromParams', editor => {
@@ -108,7 +150,8 @@ export function activate(context: ExtensionContext) {
         providerRegistrations,
         replaceParamsCmd,
         replaceParamsToFileCmd,
-        generateScriptFromParamsCmd
+        generateScriptFromParamsCmd,
+        getTemplateCmd
     );
 }
 
@@ -118,6 +161,42 @@ const _cmdFiles = new Map<string, string>();
 
 function resolvePath(p: string): string {
     return p.startsWith('~') ? path.join(homedir(), path.normalize(p.replace(/^~[\/\\]/, ''))) : path.normalize(p);
+}
+
+// TODO: use github apis https://developer.github.com/v3/repos/contents/
+function getTemplateUrls(): Thenable<string[]> {
+    return new Promise<string[]>((resolve, reject) => {
+        let url = getDefaultTemplateUrl();
+        if (url === undefined) {
+            window.showErrorMessage('no url set, please set frigg.templatesUrl to a valid url');
+            return;
+        }
+
+        let baseUri = Uri.parse(url as string);
+        request(url, function (error: any | null, response: any|null, body: any|null) {
+            if (error !== null) {
+                window.showErrorMessage(`can't fetch templates ${error}`);
+                reject();
+                return;
+            }
+
+            if (response === null || response.statusCode !== 200) {
+                window.showErrorMessage(`can't get template list returned ${response === null ? 'NULL' : `status: ${response.statusCode}`}`);
+                reject();
+                return;
+            }
+
+            const $ = cheerio.load(body);
+            let anchors: any[] = Array.from($('table.files').find('td.content').find('a'));
+            let paths: string[] = anchors.filter(a => a !== null && 'attribs' in a && 'href' in a.attribs)
+                                         .map(a => baseUri.with({ path: a.attribs['href'].replace('/blob/', '/raw/', 1) }).toString());
+            resolve(paths);
+        });
+    });
+}
+
+function getDefaultTemplateUrl(): string | undefined {
+    return workspace.getConfiguration('frigg', null).get('templatesUrl');
 }
 
 function getDefaultParamsFile(params: Params): string {
@@ -131,7 +210,7 @@ function getDefaultTemplateFile(paramsFsPath: string): string {
         return d;
     }
 
-    let folder: string | undefined = workspace.getConfiguration('frigg', null).get('templateFolder');
+    let folder: string | undefined = workspace.getConfiguration('frigg', null).get('templatesFolder');
     return path.join(resolvePath(folder === undefined ? '~' : folder), 'template.json');
 }
 
@@ -142,11 +221,11 @@ function discoverTemplateFiles(): Thenable<string[]> {
             files = [];
         }
 
-        let templateFolder: string | undefined = workspace.getConfiguration('frigg', null).get('templateFolder');
-        if (templateFolder === undefined) {
+        let templatesFolder: string | undefined = workspace.getConfiguration('frigg', null).get('templatesFolder');
+        if (templatesFolder === undefined) {
             return files;
         } else {
-            let folderPath = resolvePath(templateFolder);
+            let folderPath = resolvePath(templatesFolder);
             return new Promise<string[]>((resolve, reject) => fs.readdir(folderPath, (err, moreFiles) => {
                 if (err !== null && moreFiles !== undefined) {
                     let jsonFiles = moreFiles.filter(f => f.endsWith('.json'));

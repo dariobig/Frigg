@@ -53,7 +53,7 @@ This extension contributes the following settings:
 * `frigg.parameterPattern`: specifies the parameters regex pattern, 
   * defaults to: `@@[^@\\s]+@@`
 * `frigg.deleteMissingParams`: if true automatically deletes parameter values from the json file if deleted from the template file
-* `frigg.templateFolder`: set a default folder to store common template files
+* `frigg.templatesFolder`: set a default folder to store common template files
 
 ## Known Issues
 

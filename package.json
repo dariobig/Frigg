@@ -4,6 +4,7 @@
     "description": "Parmetrize your scripts via pre-processor replacement.",
     "version": "0.1.1",
     "publisher": "bigonazzi",
+    "license": "Apache-2.0",
     "engines": {
         "vscode": "^1.21.0"
     },
@@ -13,7 +14,8 @@
     "activationEvents": [
         "onCommand:extension.replaceParameters",
         "onCommand:extension.replaceParamsToFile",
-        "onCommand:extension.generateScriptFromParams"
+        "onCommand:extension.generateScriptFromParams",
+        "onCommand:extension.getTemplate"
     ],
     "main": "./out/extension",
     "contributes": {
@@ -27,11 +29,17 @@
                     "default": "@@([^@\\s]+)@@",
                     "description": "The pattern of params to replace."
                 },
-                "frigg.templateFolder": {
+                "frigg.templatesFolder": {
                     "scope": "resource",
                     "type": "string",
                     "default": "~/templates",
                     "description": "FriGG will look up templates in this folder."
+                },
+                "frigg.templatesUrl": {
+                    "scope": "resource",
+                    "type": "string",
+                    "default": "https://github.com/bigonazzi/Frigg/tree/master/src/templates",
+                    "description": "FriGG will download default templates from this github page."
                 },
                 "frigg.deleteMissingParams": {
                     "scope": "resource",
@@ -55,6 +63,11 @@
             {
                 "command": "extension.generateScriptFromParams",
                 "title": "Generate script using a template file",
+                "category": "FriGG"
+            },
+            {
+                "command": "extension.getTemplate",
+                "title": "Get published templates",
                 "category": "FriGG"
             }
         ],
@@ -91,7 +104,9 @@
         "@types/mocha": "^2.2.42"
     },
     "dependencies": {
-        "npm": "^5.7.1"
+        "cheerio": "^1.0.0-rc.2",
+        "npm": "^5.7.1",
+        "request": "^2.85.0"
     },
     "repository": {
         "type": "git",
