@@ -45,6 +45,7 @@ Then open a parameter file and generate an output script:
 - parameter value serialization
 - custom parameter pattern
 - use a user defined template file to generate a script / document
+- downalod templates from github
 
 ## Extension Settings
 
@@ -54,6 +55,7 @@ This extension contributes the following settings:
   * defaults to: `@@[^@\\s]+@@`
 * `frigg.deleteMissingParams`: if true automatically deletes parameter values from the json file if deleted from the template file
 * `frigg.templatesFolder`: set a default folder to store common template files
+* `frigg.templatesUrl`: points to a GitHub folder url containing template files to download
 
 ## Known Issues
 

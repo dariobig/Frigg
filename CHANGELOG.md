@@ -3,8 +3,14 @@ All notable changes to the "frigg" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
-- Initial release
+## 0.1.2 - 2018-03-23
+
+### Added
+
+Download templates from GitHub
+
+### Added
+- remeber template file location
 
 ## 0.1.1 - 2018-03-23
 
@@ -30,3 +36,6 @@ parameters into a command line (or similar).
 
 ### Fixed
 - extension initializes on other commands
+
+## [Unreleased]
+- Initial release
