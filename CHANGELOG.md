@@ -6,6 +6,18 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 - Initial release
 
+## 0.1.1 - 2018-03-23
+
+Template file improvements
+
+### Added
+- remeber template file location
+- default template folder
+
+### Fixed
+- renamed "build command from parameters" => "Generate script using a template file"
+- handle creation of empty template files
+
 ## 0.0.4 - 2018-03-22
 
 Added a "build command from parameters" command. You can use a separate template file containing rules on how to format
