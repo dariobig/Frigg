@@ -27,6 +27,12 @@
                     "default": "@@([^@\\s]+)@@",
                     "description": "The pattern of params to replace."
                 },
+                "frigg.templateFolder": {
+                    "scope": "resource",
+                    "type": "string",
+                    "default": "~/templates",
+                    "description": "FriGG will look up templates in this folder."
+                },
                 "frigg.deleteMissingParams": {
                     "scope": "resource",
                     "type": "boolean",

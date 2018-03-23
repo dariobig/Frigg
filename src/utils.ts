@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 export function parseJsonSync<T>(json: string|null): T | null {
     if (json === null) {
         return null;
@@ -72,4 +75,16 @@ function getProperty(obj: any, property: string): any | undefined {
         }
     }
     return undefined;
+}
+
+export function mkDirRecursive(filePath: string) {
+    path.dirname(filePath)
+        .split(path.sep)
+        .reduce((currentPath, folder) => {
+            currentPath += folder + path.sep;
+            if (!fs.existsSync(currentPath)){
+                fs.mkdirSync(currentPath);
+            }
+            return currentPath;
+        }, '');
 }

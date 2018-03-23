@@ -66,6 +66,10 @@ export default class InterfaceBuilder {
         return new InterfaceBuilder(config, compiledRules);
     }
 
+    static getDefaultConfig(): Config {
+        return new Config();
+    }
+
     static build(jsonConfig: string, paramsMap: ParamsMap): string|null {
         let b = InterfaceBuilder.fromJsonConfig(jsonConfig);
         return b === null ? null : b.toString(paramsMap);
@@ -91,10 +95,15 @@ class Rule {
 }
 
 class Config {
-    Template: string = "";
-    Rules: Rule[] = [];
+    Template: string;
+    Rules: Rule[];
 
-    private static defaultConfig: Config = {Template: '', Rules: []};
+    constructor(template: string = '', rules: Rule[] = []) {
+        this.Template = template;
+        this.Rules = rules;
+    }
+
+    private static defaultConfig: Config = new Config();
 
     static validate(obj: any): Config | null {
         let config: Config | null = validate(obj, Config.defaultConfig);

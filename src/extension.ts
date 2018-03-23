@@ -2,10 +2,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import {homedir} from 'os';
 import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, TextDocument, TextEditor, ViewColumn} from 'vscode';
 import Params, {validateParamsMap, ParamsMap} from './params';
 import ReplacementProvider from './replacementProvider';
 import InterfaceBuilder from './interfaceBuilder';
+import {mkDirRecursive} from './utils';
 
 
 export function activate(context: ExtensionContext) {
@@ -32,56 +34,69 @@ export function activate(context: ExtensionContext) {
         }
 
         let paramsFsPath = editor.document.uri.fsPath;
-        let knownRuleFiles: Thenable<string[]> = new Promise((resolve, reject) => resolve([..._ruleFiles.values()]));
-        let defaultRuleFile = _ruleFiles.get(paramsFsPath);
-        askForFile(defaultRuleFile, knownRuleFiles, 'please select a rule file ...', false).then(ruleFile => {
-            if (ruleFile === undefined) {
+        askForFile(getDefaultTemplateFile(paramsFsPath), discoverTemplateFiles(), 'please select a template file ...', false).then(templateFile => {
+            if (templateFile === undefined) {
                 return;
             }
-            
-            fs.readFile(ruleFile, 'utf8', (err, data) => {
-                if (err !== null) {
-                    window.showErrorMessage(`can't read file ${ruleFile}`);
-                    return;
-                }
-                
-                let cmd = InterfaceBuilder.build(data, paramsMap as ParamsMap);
-                if (cmd === null) {
-                    window.showErrorMessage(`can't parse rule file ${ruleFile}`);
-                    return;
-                }
-           
-                // Remember rule file
-                _ruleFiles.set(paramsFsPath, ruleFile);
 
-                let knownCmdFiles: Thenable<string[]> = new Promise((resolve, reject) => resolve([..._cmdFiles.values()]));
-                let suggestedCmdName = _cmdFiles.get(paramsFsPath);
-                if (suggestedCmdName === undefined) {
-                    let paramsPath = path.parse(editor.document.uri.fsPath);
-                    let rulesPath = path.parse(ruleFile);
-                    suggestedCmdName = path.join(paramsPath.dir, `${paramsPath.name}.${rulesPath.name}.txt`);
-                }
-
-                askForFile(suggestedCmdName, knownCmdFiles, 'please pick an output file ...').then((cmdFile) => {
-                    if (cmdFile === undefined) {
-                        return;
-                    }
-
-                    fs.writeFile(cmdFile, cmd, 'utf8', (err) => {
+            let column = nextColumn(editor);
+            fs.exists(templateFile, exists => {
+                if (!exists) {
+                    mkDirRecursive(templateFile);
+                    fs.writeFile(templateFile, JSON.stringify(InterfaceBuilder.getDefaultConfig(), null, 2), (err) => {
                         if (err !== null) {
-                            window.showErrorMessage(`can't write command file ${cmdFile}`);
+                            window.showErrorMessage(`can't write to template file ${templateFile}: ${err}`);
                             return;
                         }
+                    });
+                    workspace.openTextDocument(templateFile).then(doc => window.showTextDocument(doc, column));
+                    return;
+                }
 
-                        return workspace.openTextDocument(cmdFile).then(doc => {
-                            if (doc === undefined) {
-                                window.showErrorMessage(`something went wrong opening ${cmdFile}`);
+                fs.readFile(templateFile, 'utf8', (err, data) => {
+                    if (err !== null) {
+                        window.showErrorMessage(`can't read template file ${templateFile}`);
+                        return;
+                    }
+                    
+                    let cmd = InterfaceBuilder.build(data, paramsMap as ParamsMap);
+                    if (cmd === null) {
+                        window.showErrorMessage(`can't parse rule file ${templateFile}`);
+                        return;
+                    }
+               
+                    // Remember template file
+                    _templateFiles.set(paramsFsPath, templateFile);
+    
+                    let knownCmdFiles: Thenable<string[]> = new Promise((resolve, reject) => resolve([..._cmdFiles.values()]));
+                    let suggestedCmdName = _cmdFiles.get(paramsFsPath);
+                    if (suggestedCmdName === undefined) {
+                        let paramsPath = path.parse(editor.document.uri.fsPath);
+                        let rulesPath = path.parse(templateFile);
+                        suggestedCmdName = path.join(paramsPath.dir, `${paramsPath.name}.${rulesPath.name}.txt`);
+                    }
+    
+                    askForFile(suggestedCmdName, knownCmdFiles, 'please pick an output file ...').then((cmdFile) => {
+                        if (cmdFile === undefined) {
+                            return;
+                        }
+    
+                        fs.writeFile(cmdFile, cmd, 'utf8', (err) => {
+                            if (err !== null) {
+                                window.showErrorMessage(`can't write command file ${cmdFile}`);
                                 return;
                             }
-
-                            // Remember cmd file
-                            _cmdFiles.set(paramsFsPath, cmdFile);
-                            window.showTextDocument(doc, nextColumn(editor));
+    
+                            return workspace.openTextDocument(cmdFile).then(doc => {
+                                if (doc === undefined) {
+                                    window.showErrorMessage(`something went wrong opening ${cmdFile}`);
+                                    return;
+                                }
+    
+                                // Remember cmd file
+                                _cmdFiles.set(paramsFsPath, cmdFile);
+                                window.showTextDocument(doc, column);
+                            });
                         });
                     });
                 });
@@ -98,12 +113,49 @@ export function activate(context: ExtensionContext) {
 }
 
 const _paramsFiles = new Map<string, string>();
-const _ruleFiles = new Map<string, string>();
+const _templateFiles = new Map<string, string>();
 const _cmdFiles = new Map<string, string>();
+
+function resolvePath(p: string): string {
+    return p.startsWith('~') ? path.join(homedir(), path.normalize(p.replace(/^~[\/\\]/, ''))) : path.normalize(p);
+}
 
 function getDefaultParamsFile(params: Params): string {
     let d = _paramsFiles.get(params.original.toString());
     return d === undefined ? params.defaultParametersPath() : d;
+}
+
+function getDefaultTemplateFile(paramsFsPath: string): string {
+    let d = _templateFiles.get(paramsFsPath);
+    if (d !== undefined) {
+        return d;
+    }
+
+    let folder: string | undefined = workspace.getConfiguration('frigg', null).get('templateFolder');
+    return path.join(resolvePath(folder === undefined ? '~' : folder), 'template.json');
+}
+
+function discoverTemplateFiles(): Thenable<string[]> {
+    let templates: Thenable<string[]> = new Promise((resolve, reject) => resolve([..._templateFiles.values()]));
+    return templates.then(files => {
+        if (files === undefined || files === null) {
+            files = [];
+        }
+
+        let templateFolder: string | undefined = workspace.getConfiguration('frigg', null).get('templateFolder');
+        if (templateFolder === undefined) {
+            return files;
+        } else {
+            let folderPath = resolvePath(templateFolder);
+            return new Promise<string[]>((resolve, reject) => fs.readdir(folderPath, (err, moreFiles) => {
+                if (err !== null && moreFiles !== undefined) {
+                    let jsonFiles = moreFiles.filter(f => f.endsWith('.json'));
+                    resolve(files.concat(jsonFiles.map(f => path.join(folderPath, f))));
+                }
+                resolve(files);
+            }));
+        }
+    });
 }
 
 function nextColumn(editor: TextEditor): number {
@@ -215,6 +267,6 @@ function askForFile(defaultFile: string | undefined,
 // this method is called when your extension is deactivated
 export function deactivate() {
     _paramsFiles.clear();
-    _ruleFiles.clear();
+    _templateFiles.clear();
     _cmdFiles.clear();
 }
