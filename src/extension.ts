@@ -3,11 +3,11 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {homedir} from 'os';
-import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, TextDocument, TextEditor, ViewColumn, QuickPickItem} from 'vscode';
+import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, TextDocument, TextEditor, ViewColumn} from 'vscode';
 import Params, {validateParamsMap, ParamsMap} from './params';
 import ReplacementProvider from './replacementProvider';
 import InterfaceBuilder from './interfaceBuilder';
-import {mkDirRecursive} from './utils';
+import {mkFileDirRecursive} from './utils';
 
 const request = require('request');
 
@@ -27,44 +27,22 @@ export function activate(context: ExtensionContext) {
         replaceParams(editor.document, nextColumn(editor), false);
     });
 
-    const getTemplateCmd = commands.registerTextEditorCommand('extension.getTemplate', editor => {
-        let column = nextColumn(editor);
-
-        // TODO:
-        // Check default url
-        // Check default template folder
-        // If doesn't exist select + create
-        // Download all files into folder
-
-        window.showQuickPick(getTemplateUrls(), { placeHolder: 'pick a template to download' }).then(selected => {
-            if (selected === undefined) {
-                return;
+    const downloadTemplatesCmd = commands.registerCommand('extension.downloadTemplates', () => {
+        let resource = window.activeTextEditor ? window.activeTextEditor.document.uri : undefined;
+        downloadTemplates(resource).then(files => {}, err => {
+            if (err !== undefined && err !== null && err !== '') {
+                window.showErrorMessage(err);
             }
-
-            makeRequest(selected.description).then(body => {
-                let templatesFolder = getDefaultTemplatesFolder(editor.document.uri);
-                let fileUri = Uri.file(templatesFolder !== undefined ? path.join(templatesFolder, selected.label) : selected.label);
-                window.showSaveDialog({ saveLabel: 'save template file', defaultUri: fileUri }).then(saveTo => {
-                    if (saveTo === undefined) {
-                        return;
-                    }
-                    
-                    let saveToPath = saveTo.fsPath;
-                    mkDirRecursive(saveToPath);
-                    fs.writeFile(saveToPath, body, 'utf8', err => {
-                        if (err !== null) {
-                            window.showErrorMessage(`can't write template file ${saveTo}: ${err}`);
-                        }
-
-                        updateTemplatesFolder(editor.document.uri, path.dirname(saveToPath));
-                        workspace.openTextDocument(saveTo).then(doc => window.showTextDocument(doc, column));
-                    });
-                });
-            });
         });
     });
 
+    // TODO: add command to show template folder / files
+
     const generateScriptFromParamsCmd = commands.registerTextEditorCommand('extension.generateScriptFromParams', editor => {
+        // Find template folder, if not set ask to run download
+        // Pick template file from folder, or any
+        // ...
+        
         let paramsMap = validateParamsMap(Params.parseParameters(editor.document.getText()));
         if (paramsMap === null) {
             window.showErrorMessage('not a valid parameter file');
@@ -74,9 +52,8 @@ export function activate(context: ExtensionContext) {
         let resource = editor.document.uri;
         let paramsFsPath = resource.fsPath;
         let defaultTemplate = getDefaultTemplateFile(paramsFsPath);
-        let otherTemplates = discoverTemplateFiles(resource);
+        let otherTemplates = discoverTemplateFiles(resource).then((_) => _, (_) => downloadTemplates(resource));
         askForFile(defaultTemplate, otherTemplates, 'please select a template file ...', false).then(templateFile => {
-            
             if (templateFile === undefined) {
                 return;
             }
@@ -84,7 +61,7 @@ export function activate(context: ExtensionContext) {
             let column = nextColumn(editor);
             fs.exists(templateFile, exists => {
                 if (!exists) {
-                    mkDirRecursive(templateFile);
+                    mkFileDirRecursive(path.dirname(templateFile));
                     fs.writeFile(templateFile, JSON.stringify(InterfaceBuilder.getDefaultConfig(), null, 2), (err) => {
                         if (err !== null) {
                             window.showErrorMessage(`can't write to template file ${templateFile}: ${err}`);
@@ -151,7 +128,7 @@ export function activate(context: ExtensionContext) {
         replaceParamsCmd,
         replaceParamsToFileCmd,
         generateScriptFromParamsCmd,
-        getTemplateCmd
+        downloadTemplatesCmd
     );
 }
 
@@ -163,35 +140,17 @@ function resolvePath(p: string): string {
     return p.startsWith('~') ? path.join(homedir(), path.normalize(p.replace(/^~[\/\\]/, ''))) : path.normalize(p);
 }
 
-function getTemplateUrls(): Thenable<QuickPickItem[]> {
-    return new Promise<QuickPickItem[]>((resolve, reject) => {
-        
-        let url = getDefaultTemplateUrl();
-        if (url === undefined) {
-            window.showErrorMessage('no templates url set!');
-            reject();
-            return;
-        }
-
-        makeRequest(url).then(content => {
-            const files = JSON.parse(content) as any[];
-            resolve(files.filter(f => f['type'] === 'file')
-                .map(f => { return {label: f['name'], description: f['download_url']}; }));
-        });
-    });
-}
-
 function getDefaultTemplateUrl(): string | undefined {
     return workspace.getConfiguration('frigg', null).get('templatesUrl');
 }
 
-function getDefaultTemplatesFolder(resource: Uri): string | undefined {
+function getDefaultTemplatesFolder(resource: Uri | undefined): string | undefined {
     return workspace.getConfiguration('frigg', resource).get('templatesFolder');
 }
 
-function updateTemplatesFolder(uri: Uri, value: any): Thenable<void> {
+function updateTemplatesFolder(resource: Uri | undefined, value: any): Thenable<void> {
     const sectionName = 'templatesFolder';
-    let config = workspace.getConfiguration('frigg', uri);
+    let config = workspace.getConfiguration('frigg', resource);
     let inspect = config.inspect(sectionName);
     let useGlobal = inspect === undefined || (inspect.workspaceFolderValue === undefined && inspect.workspaceValue === undefined);
     return config.update(sectionName, value, useGlobal);
@@ -202,55 +161,26 @@ function getDefaultParamsFile(params: Params): string {
     return d === undefined ? params.defaultParametersPath() : d;
 }
 
-function getDefaultTemplateFile(paramsFsPath: string): string {
-    let d = _templateFiles.get(paramsFsPath);
-    if (d !== undefined) {
-        return d;
-    }
-
-    let folder: string | undefined = workspace.getConfiguration('frigg', null).get('templatesFolder');
-    return path.join(resolvePath(folder === undefined ? '~' : folder), 'template.json');
+function getDefaultTemplateFile(paramsFsPath: string): string | undefined {
+    return _templateFiles.get(paramsFsPath);
 }
 
 function discoverTemplateFiles(resource: Uri): Thenable<string[]> {
-    let templates: Thenable<string[]> = new Promise((resolve, reject) => resolve([..._templateFiles.values()]));
-    return templates.then(files => {
-        if (files === undefined || files === null) {
-            files = [];
-        }
-
-        let templatesFolder: string | undefined = workspace.getConfiguration('frigg', null).get('templatesFolder');
+    return new Promise((resolve, reject) => {
+        let templates = Array.from(_templateFiles.values());
+        let templatesFolder = getDefaultTemplatesFolder(resource);
         if (templatesFolder === undefined) {
-            // TODO: Trigger command to start dowloading templates ...
-            window.showErrorMessage('no template folder set!');
-            return new Promise((resolve, reject) => reject());
+            templates.length === 0 ? reject('template folder not set') : resolve(templates);
         } else {
             let folderPath = resolvePath(templatesFolder);
-            return new Promise<string[]>((resolve, reject) => fs.readdir(folderPath, (err, moreFiles) => {
-                if (err !== null && moreFiles !== undefined) {
+            fs.readdir(folderPath, (err, moreFiles) => {
+                if (err === null && moreFiles !== undefined) {
                     let jsonFiles = moreFiles.filter(f => f.endsWith('.json'));
-                    resolve(files.concat(jsonFiles.map(f => path.join(folderPath, f))));
+                    templates = templates.concat(jsonFiles.map(f => path.join(folderPath, f)));
                 }
-                resolve(files);
-            }));
+                resolve(templates);
+            });
         }
-    });
-}
-
-function listTemplatesGitHubFolder(): Thenable<QuickPickItem[]> {
-    let url = getDefaultTemplateUrl();
-    if (url === undefined) {
-        return new Promise((resolve, reject) => reject('no templates url is defined!'));
-    }
-
-    return makeRequest(url).then(content => {
-        if (content === null) {
-            return [] as QuickPickItem[];
-        }
-
-        let directory = JSON.parse(content) as any[];
-        return directory.filter(f => f !== null && 'name' in f && 'download_url' in f)
-            .map(f => { return { label: f['name'], description: f['download_url'] }; });
     });
 }
 
@@ -261,6 +191,92 @@ function nextColumn(editor: TextEditor): number {
 function setDefaultParamsFile(uri: Uri, paramsFilePath: string) {
     _paramsFiles.set(uri.toString(), paramsFilePath);
 }
+
+function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
+    return new Promise((resolve, reject) => {
+        let url = getDefaultTemplateUrl();
+        if (url === undefined) {
+            reject('no templates url set!');
+            return;
+        }
+
+        // Pick template folder
+        let templatesFolder = getDefaultTemplatesFolder(resource);
+        let opt = {
+            defaultUri: templatesFolder !== undefined ? Uri.file(templatesFolder) : undefined,
+            canSelectFiles: false, 
+            canSelectMany: false, 
+            canSelectFolders: true 
+        };
+
+        window.showOpenDialog(opt).then(selected => {
+            if (selected === undefined || selected.length < 1) {
+                reject();
+                return;
+            }
+
+            let selectedFolder = selected[0].fsPath;
+            if (!mkFileDirRecursive(selectedFolder)) {
+                reject(`can't create folder ${selectedFolder}`);
+                return;
+            }
+
+            // remember new template folder
+            updateTemplatesFolder(resource, selectedFolder);
+            
+            window.showQuickPick([url as string], { placeHolder: 'Download templates from ...' }).then(selected => {
+                if (selected === undefined) {
+                    reject();
+                    return;
+                }
+
+                makeRequest(selected).then(content => {
+                    const items = JSON.parse(content) as any[];
+                    let files = items.filter(f => 'type' in f && 'name' in f && 'download_url' in f && f['type'] === 'file');
+                    if (files.length === 0) {
+                        reject('no template files found.');
+                        return;
+                    }
+                    
+                    let completed: string[] = [];
+                    let errors = 0;
+                    let complete = function() {
+                        if (completed.length + errors >= files.length) {
+                            window.showInformationMessage(`Done! ${files.length - errors} templates downloaded, ${errors} errors.`);
+                            resolve(completed);
+                        }
+                    };
+
+                    for (let i = 0; i < files.length; ++i) {
+                        let f = files[i];
+                        let filePath = path.join(selectedFolder, f['name']);
+                        window.showInformationMessage(`downloading ${f['name']} ...`);
+                        makeRequest(f['download_url']).then(body => {
+                            if (body === undefined || body === null) {
+                                window.showErrorMessage(`can't download ${f['name']} from: ${f['download_url']}`);
+                                errors++;
+                                complete();
+                                return;
+                            }
+
+                            fs.writeFile(filePath, body, 'utf8', err => {
+                                if (err !== null) {
+                                    window.showErrorMessage(`can't write template file ${filePath}: ${err}`);
+                                    complete();
+                                    return;
+                                }
+
+                                completed.push(filePath);
+                                complete();
+                            });
+                        });
+                    }
+                });
+            }); 
+        });
+    });
+}
+
 
 function replaceParams(original: TextDocument, column: ViewColumn, readOnly: boolean = true) {
     let params = new Params(original);
@@ -309,7 +325,7 @@ function replaceParams(original: TextDocument, column: ViewColumn, readOnly: boo
 }
 
 function askForFile(defaultFile: string | undefined,
-                    files: Thenable<string[]> | null,
+                    files: Thenable<string[] | undefined> | null,
                     placeHolder: string,
                     overWritePick: boolean = true): Thenable<string|undefined> {
     
@@ -324,7 +340,7 @@ function askForFile(defaultFile: string | undefined,
         options = defaultFile === undefined ? [shouldOpenDialog] : [defaultFile, shouldOpenDialog];
     } else {
         options = files.then((files) => {
-            files = files.filter(f => f !== defaultFile).concat([shouldOpenDialog]);
+            files = (files === undefined ? [] : files).filter(f => f !== defaultFile).concat([shouldOpenDialog]);
             return defaultFile === undefined ? files : [defaultFile].concat(files);
         });
     }

@@ -15,7 +15,7 @@
         "onCommand:extension.replaceParameters",
         "onCommand:extension.replaceParamsToFile",
         "onCommand:extension.generateScriptFromParams",
-        "onCommand:extension.getTemplate"
+        "onCommand:extension.downloadTemplates"
     ],
     "main": "./out/extension",
     "contributes": {
@@ -66,8 +66,8 @@
                 "category": "FriGG"
             },
             {
-                "command": "extension.getTemplate",
-                "title": "Get published templates",
+                "command": "extension.downloadTemplates",
+                "title": "Download published templates",
                 "category": "FriGG"
             }
         ],

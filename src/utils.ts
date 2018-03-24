@@ -87,9 +87,9 @@ export function folderExists(folderPath: string) : Thenable<boolean> {
     });
 }
 
-export function mkDirRecursive(filePath: string) {
-    path.dirname(filePath)
-        .split(path.sep)
+export function mkFileDirRecursive(filePath: string): boolean {
+    try {
+        filePath.split(path.sep)
         .reduce((currentPath, folder) => {
             currentPath += folder + path.sep;
             if (!fs.existsSync(currentPath)){
@@ -97,4 +97,8 @@ export function mkDirRecursive(filePath: string) {
             }
             return currentPath;
         }, '');
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
