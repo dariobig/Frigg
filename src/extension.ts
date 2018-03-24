@@ -3,15 +3,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {homedir} from 'os';
-import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, TextDocument, TextEditor, ViewColumn, OpenDialogOptions, QuickPickItem} from 'vscode';
+import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, TextDocument, TextEditor, ViewColumn, QuickPickItem} from 'vscode';
 import Params, {validateParamsMap, ParamsMap} from './params';
 import ReplacementProvider from './replacementProvider';
 import InterfaceBuilder from './interfaceBuilder';
 import {mkDirRecursive} from './utils';
-import { resolve } from 'dns';
 
 const request = require('request');
-// const cheerio = require('cheerio');
 
 export function activate(context: ExtensionContext) {
 
