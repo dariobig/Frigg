@@ -38,7 +38,7 @@
                 "frigg.templatesUrl": {
                     "scope": "resource",
                     "type": "string",
-                    "default": "https://github.com/bigonazzi/Frigg/tree/master/templates",
+                    "default": "https://api.github.com/repos/bigonazzi/Frigg/contents/templates",
                     "description": "FriGG will download default templates from this github page."
                 },
                 "frigg.deleteMissingParams": {

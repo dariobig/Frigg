@@ -77,6 +77,16 @@ function getProperty(obj: any, property: string): any | undefined {
     return undefined;
 }
 
+export function folderExists(folderPath: string) : Thenable<boolean> {
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(folderPath)) {
+            return resolve(false);
+        }
+
+        resolve(fs.lstatSync(folderPath).isDirectory());
+    });
+}
+
 export function mkDirRecursive(filePath: string) {
     path.dirname(filePath)
         .split(path.sep)
