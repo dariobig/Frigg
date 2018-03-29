@@ -19,15 +19,15 @@ export function activate(context: ExtensionContext) {
         workspace.registerTextDocumentContentProvider(ReplacementProvider.scheme, replacementProvider)
     );
 
-    const replaceParamsCmd = commands.registerTextEditorCommand('extension.replaceParameters', editor => {
+    const replaceParamsCmd = commands.registerTextEditorCommand('frigg.replaceParameters', editor => {
         replaceParams(editor.document, nextColumn(editor));
     });
 
-    const replaceParamsToFileCmd = commands.registerTextEditorCommand('extension.replaceParamsToFile', editor => {
+    const replaceParamsToFileCmd = commands.registerTextEditorCommand('frigg.replaceParamsToFile', editor => {
         replaceParams(editor.document, nextColumn(editor), false);
     });
 
-    const downloadTemplatesCmd = commands.registerCommand('extension.downloadTemplates', () => {
+    const downloadTemplatesCmd = commands.registerCommand('frigg.downloadTemplates', () => {
         let resource = window.activeTextEditor ? window.activeTextEditor.document.uri : undefined;
         downloadTemplates(resource).then(files => {}, err => {
             if (err !== undefined && err !== null && err !== '') {
@@ -38,7 +38,7 @@ export function activate(context: ExtensionContext) {
 
     // TODO: add command to show template folder / files
 
-    const generateScriptFromParamsCmd = commands.registerTextEditorCommand('extension.generateScriptFromParams', editor => {
+    const generateScriptFromParamsCmd = commands.registerTextEditorCommand('frigg.generateScriptFromParams', editor => {
         // Find template folder, if not set ask to run download
         // Pick template file from folder, or any
         // ...

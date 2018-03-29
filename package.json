@@ -12,10 +12,10 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.replaceParameters",
-        "onCommand:extension.replaceParamsToFile",
-        "onCommand:extension.generateScriptFromParams",
-        "onCommand:extension.downloadTemplates"
+        "onCommand:frigg.replaceParameters",
+        "onCommand:frigg.replaceParamsToFile",
+        "onCommand:frigg.generateScriptFromParams",
+        "onCommand:frigg.downloadTemplates"
     ],
     "main": "./out/extension",
     "contributes": {
@@ -51,22 +51,22 @@
         },
         "commands": [
             {
-                "command": "extension.replaceParameters",
+                "command": "frigg.replaceParameters",
                 "title": "Replace script parameters",
                 "category": "FriGG"
             },
             {
-                "command": "extension.replaceParamsToFile",
+                "command": "frigg.replaceParamsToFile",
                 "title": "Replace scripts parameters (save to file)",
                 "category": "FriGG"
             },
             {
-                "command": "extension.generateScriptFromParams",
+                "command": "frigg.generateScriptFromParams",
                 "title": "Generate script using a template file",
                 "category": "FriGG"
             },
             {
-                "command": "extension.downloadTemplates",
+                "command": "frigg.downloadTemplates",
                 "title": "Download published templates",
                 "category": "FriGG"
             }
@@ -74,15 +74,15 @@
         "menus": {
             "editor/context": [
                 {
-                    "command": "extension.replaceParameters",
+                    "command": "frigg.replaceParameters",
                     "category": "FriGG"
                 },
                 {
-                    "command": "extension.replaceParamsToFile",
+                    "command": "frigg.replaceParamsToFile",
                     "category": "FriGG"
                 },
                 {
-                    "command": "extension.generateScriptFromParams",
+                    "command": "frigg.generateScriptFromParams",
                     "category": "FriGG",
                     "when": "resourceLangId == json"
                 }
