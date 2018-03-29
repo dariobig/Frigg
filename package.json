@@ -105,7 +105,8 @@
     },
     "dependencies": {
         "npm": "^5.7.1",
-        "request": "^2.85.0"
+        "request": "^2.85.0",
+        "typescript": "^2.6.1"
     },
     "repository": {
         "type": "git",
