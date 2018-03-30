@@ -1,5 +1,5 @@
 import {Uri, TextDocument, workspace, window} from 'vscode';
-import {validate} from './utils';
+import {validate, wrap} from './utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -133,17 +133,7 @@ export class Param {
     }
 
     public static wrap(obj: any|null|undefined): Param {
-        if (obj === null || obj === undefined || typeof(obj) !== 'object') {
-            return new Param('');
-        }
-
-        for (let k in Param.defaultParam) {
-            if (k in obj && typeof obj[k] === 'string') {
-                obj[k] = '';
-            }
-        }
-
-        return obj as Param;
+        return wrap(obj, Param.defaultParam) as Param;
     }
 
     static defaultParam: Param = new Param();

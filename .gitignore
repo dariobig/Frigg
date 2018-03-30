@@ -4,3 +4,4 @@ node_modules
 *.vsix
 .vs/**
 npm-debug.log
+*_settings.json
