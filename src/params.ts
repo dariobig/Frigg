@@ -62,7 +62,6 @@ export default class Params {
         });
     }
 
-
     static loadParameters(paramsFile: string): ParamsMap | null {
         if (!fs.existsSync(paramsFile)) {
             return null;

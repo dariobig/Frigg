@@ -14,8 +14,10 @@ export default class ReplacementProvider implements vscode.TextDocumentContentPr
     }
 
     static getUri(params: Params): vscode.Uri {
-        const query = JSON.stringify([JSON.stringify(params.getParams()), 
-                                      params.lastParamFile !== null ? params.lastParamFile : '']);
+        let now = new Date().getMilliseconds().toString();
+        let jsParams = JSON.stringify(params.getParams());
+        let original = params.lastParamFile !== null ? params.lastParamFile : '';
+        const query = JSON.stringify([jsParams, original, now]);
         return vscode.Uri.parse(`${ReplacementProvider.scheme}:${localScriptPath(params.original)}?${query}`);
     }
 
@@ -43,7 +45,7 @@ export default class ReplacementProvider implements vscode.TextDocumentContentPr
 }
 
 function decodeParams(uri: vscode.Uri): [ParamsMap, string|null] {
-    let [mapStr, paramsFile] = JSON.parse(uri.query) as [string, string];
+    let [mapStr, paramsFile,] = JSON.parse(uri.query) as [string, string, string];
     return [JSON.parse(mapStr), paramsFile === '' ? null : paramsFile];
 }
 

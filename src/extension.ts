@@ -278,8 +278,9 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
 }
 
 
-function replaceParams(original: TextDocument, column: ViewColumn, readOnly: boolean = true) {
-    let params = new Params(original);
+function replaceParams(document: TextDocument, column: ViewColumn, readOnly: boolean = true) {
+    let params = new Params(document);
+    let originalUri = document.uri;
     askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles(), 'select a parameter file to use / create ...').then((selected) => {
         if (selected === undefined) {
             return;
@@ -289,28 +290,28 @@ function replaceParams(original: TextDocument, column: ViewColumn, readOnly: boo
             window.showInformationMessage(`Generating parameter value file from ${selected}\n`+
                                           'Please add any replacement to the value file.');
             params.saveParams(selected).then(p => {
-                setDefaultParamsFile(original.uri, p.fsPath);
+                setDefaultParamsFile(originalUri, p.fsPath);
                 return workspace.openTextDocument(p);
             }).then(doc => window.showTextDocument(doc, column), err => window.showErrorMessage(err));
         } else {
-            params.saveParams(selected).then(p => setDefaultParamsFile(original.uri, p.fsPath), err => window.showErrorMessage(err));
+            params.saveParams(selected).then(p => setDefaultParamsFile(originalUri, p.fsPath), err => window.showErrorMessage(err));
             const replacementUri = ReplacementProvider.getUri(params);
 
             if (readOnly) {
                 workspace.openTextDocument(replacementUri).then(doc => window.showTextDocument(doc, column), err => window.showErrorMessage(err));
             } else {
-                workspace.openTextDocument(replacementUri).then(doc => {
-                    if (doc === undefined || doc === null) {
+                workspace.openTextDocument(replacementUri).then(replaced => {
+                    if (replaced === undefined || replaced === null) {
                         window.showErrorMessage('error replacing document!');
                         return;
                     }
 
-                    askForFile(doc.uri.fsPath, null, 'save replaced file to ...').then(selected => {
+                    askForFile(replaced.uri.fsPath, null, 'save replaced file to ...').then(selected => {
                         if (selected === undefined || selected === null) {
                             return;
                         }
 
-                        return fs.writeFile(selected, doc.getText(), 'utf8', (err) => {
+                        return fs.writeFile(selected, replaced.getText(), 'utf8', (err) => {
                             if (err !== null) {
                                 window.showErrorMessage(`Error writing ${selected}: ${err}`);
                             } else {
