@@ -3,6 +3,14 @@ All notable changes to the "frigg" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.1.6 - 2018-04-03
+
+### Added
+- sort parameters by template rule
+
+### Fixed
+- multiple replacements
+
 ## 0.1.4 - 2018-03-29
 
 ### Fixed
