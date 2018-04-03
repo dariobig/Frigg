@@ -2,19 +2,6 @@ import * as ts from 'typescript';
 import {Param, ParamsMap} from './params';
 import {validate} from './utils';
 
-// let configStr: string = `{
-//     "Template": "UsqlScript ScriptName=(ScriptName:default,Idf.usql) AnalyticsAccountName=matrixadlaprod @@PARAMS@@",
-//     "Rules": [
-//         {"TypePattern": "string", "NamePattern": "(Input)([^@]*)", "Format": "PATHIN_\${name[2]}={in:EncryptedAzureBlobPath:\${name[2]}}"},
-//         {"TypePattern": "string", "NamePattern": "(Output)([^@]*)", "Format": "OutputReferenceEncrypted_\${name[2]}={out:AzureBlobPath:\${name[2]}}"},
-//         {"TypePattern": "int", "NamePattern": "(.*)", "Format": "PARAM_\${name[1]}=[(\${name[1]}:int,,\${value !== '' ? ':default,' + value : ''})]"},
-//         {"TypePattern": "", "NamePattern": "(.*)", "Format": "PARAM_\${name[1]}=\\"[(\${name[1]})]\\""}
-//     ]
-// }`;
-
-// let parameters: Param[] = [ new Param("Input1", "", "string"), new Param("Input2", "", "string"), new Param("OutputData", "", "string"), new Param("NumberOfTokens", "13", "int")];
-// console.log(InterfaceBuilder.build(configStr, parameters));
-
 export default class InterfaceBuilder {
     private _compiledRules: CompiledRule[];
     private _config: Config;
@@ -25,12 +12,13 @@ export default class InterfaceBuilder {
     }
 
     toString(paramsMap: ParamsMap): string {
-        let paramStrings: string[] = [];
+        let paramStrings = new Map<number, string[]>();
         
         for (let k in paramsMap) {
             let p: Param = paramsMap[k];
             let bestRule : CompiledRule | null = null;
             let bestMatch: number = 0;
+            let rank: number = -1;
 
             for (let i = 0; i < this._compiledRules.length; i++) {
                 let cr: CompiledRule = this._compiledRules[i];
@@ -38,14 +26,23 @@ export default class InterfaceBuilder {
                 if (n > bestMatch) {
                     bestMatch = n;
                     bestRule = cr;
+                    rank = i;
                 }
             }
 
             if (bestRule !== null) {
-                paramStrings.push(bestRule.apply(p).trim());
+                let otherParams: string[] | undefined = paramStrings.get(rank);
+                let params = otherParams === undefined ? [] : otherParams;
+                params.push(bestRule.apply(p).trim());
+                paramStrings.set(rank, params);
             }
         }
-        return this._config.Template.replace('@@PARAMS@@', paramStrings.join(' '));
+
+        let keys = Array.from(paramStrings.keys());
+        keys.sort();
+        let params = keys.map((k) => { return (paramStrings.get(k) as string[]).join(' '); }).join(' ');
+
+        return this._config.Template.replace('@@PARAMS@@', params);
     }
 
     static fromJsonConfig(json: string): InterfaceBuilder | null {
@@ -142,12 +139,20 @@ class CompiledRule extends Rule {
     }
 
     apply(p: Param): string {
-        let name = CompiledRule.getMatch(this._nameRe, p.name);
-        let type = CompiledRule.getMatch(this._typeRe, p.type);
+        let name = CompiledRule.getMatchOrContent(this._nameRe, p.name);
+        let type = CompiledRule.getMatchOrContent(this._typeRe, p.type);
         let rule = this.compileRule();
         return rule.Run(name, type, p.value);
     }
 
+    private static getMatchOrContent(re: RegExp | null, content: string): RegExpMatchArray {
+        let match = CompiledRule.getMatch(re, content);
+        if (match === null || match.length === 0) {
+            return [content];
+        }
+        return match;
+    }
+    
     private static getMatch(re: RegExp | null, content: string): RegExpMatchArray|null {
         if (re === null) {
             return [];

@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import Params, {ParamsMap, Param} from './params';
+import { replaceAll } from './utils';
 
 export default class ReplacementProvider implements vscode.TextDocumentContentProvider {
     static scheme = 'frigg';
@@ -34,7 +35,7 @@ export default class ReplacementProvider implements vscode.TextDocumentContentPr
         for (let key in paramsMap) {
             let value = Param.getValue(paramsMap[key]);
             header += `// ${key}: ${value === '' ? '-- NOTHING --' : value}\n`;
-            replaced = replaced.replace(key, value);
+            replaced = replaceAll(replaced, key, value);
         }
 
         return `${header}\n${replaced}`;

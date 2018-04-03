@@ -102,3 +102,11 @@ export function mkFileDirRecursive(filePath: string): boolean {
         return false;
     }
 }
+
+export function replaceAll(original: string, pattern: string, replacement: string): string {
+    return original.replace(new RegExp(escapeRegExp(pattern), 'g'), replacement);
+}
+
+function escapeRegExp(str: string) {
+    return str.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1");
+}
