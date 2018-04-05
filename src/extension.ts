@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {homedir} from 'os';
-import {workspace, window, commands, ExtensionContext, Disposable, QuickPickOptions, Uri, TextDocument, TextEditor, ViewColumn} from 'vscode';
+import * as vscode from 'vscode';
 import Params, {validateParamsMap, ParamsMap} from './params';
 import ReplacementProvider from './replacementProvider';
 import InterfaceBuilder from './interfaceBuilder';
@@ -11,41 +11,41 @@ import {mkFileDirRecursive} from './utils';
 
 const request = require('request');
 
-export function activate(context: ExtensionContext) {
+export function activate(context: vscode.ExtensionContext) {
 
     const replacementProvider = new ReplacementProvider();
 
-    const providerRegistrations = Disposable.from(
-        workspace.registerTextDocumentContentProvider(ReplacementProvider.scheme, replacementProvider)
+    const providerRegistrations = vscode.Disposable.from(
+        vscode.workspace.registerTextDocumentContentProvider(ReplacementProvider.scheme, replacementProvider)
     );
 
-    const replaceParamsCmd = commands.registerTextEditorCommand('frigg.replaceParameters', editor => {
+    const replaceParamsCmd = vscode.commands.registerTextEditorCommand('frigg.replaceParameters', editor => {
         replaceParams(editor.document, nextColumn(editor));
     });
 
-    const replaceParamsToFileCmd = commands.registerTextEditorCommand('frigg.replaceParamsToFile', editor => {
+    const replaceParamsToFileCmd = vscode.commands.registerTextEditorCommand('frigg.replaceParamsToFile', editor => {
         replaceParams(editor.document, nextColumn(editor), false);
     });
 
-    const downloadTemplatesCmd = commands.registerCommand('frigg.downloadTemplates', () => {
-        let resource = window.activeTextEditor ? window.activeTextEditor.document.uri : undefined;
+    const downloadTemplatesCmd = vscode.commands.registerCommand('frigg.downloadTemplates', () => {
+        let resource = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document.uri : undefined;
         downloadTemplates(resource).then(files => {}, err => {
             if (err !== undefined && err !== null && err !== '') {
-                window.showErrorMessage(err);
+                vscode.window.showErrorMessage(err);
             }
         });
     });
 
     // TODO: add command to show template folder / files
 
-    const generateScriptFromParamsCmd = commands.registerTextEditorCommand('frigg.generateScriptFromParams', editor => {
+    const generateScriptFromParamsCmd = vscode.commands.registerTextEditorCommand('frigg.generateScriptFromParams', editor => {
         // Find template folder, if not set ask to run download
         // Pick template file from folder, or any
         // ...
         
         let paramsMap = validateParamsMap(Params.parseParameters(editor.document.getText()));
         if (paramsMap === null) {
-            window.showErrorMessage('not a valid parameter file');
+            vscode.window.showErrorMessage('not a valid parameter file');
             return;
         }
 
@@ -64,23 +64,23 @@ export function activate(context: ExtensionContext) {
                     mkFileDirRecursive(path.dirname(templateFile));
                     fs.writeFile(templateFile, JSON.stringify(InterfaceBuilder.getDefaultConfig(), null, 2), (err) => {
                         if (err !== null) {
-                            window.showErrorMessage(`can't write to template file ${templateFile}: ${err}`);
+                            vscode.window.showErrorMessage(`can't write to template file ${templateFile}: ${err}`);
                             return;
                         }
                     });
-                    workspace.openTextDocument(templateFile).then(doc => window.showTextDocument(doc, column));
+                    vscode.workspace.openTextDocument(templateFile).then(doc => vscode.window.showTextDocument(doc, column));
                     return;
                 }
 
                 fs.readFile(templateFile, 'utf8', (err, data) => {
                     if (err !== null) {
-                        window.showErrorMessage(`can't read template file ${templateFile}`);
+                        vscode.window.showErrorMessage(`can't read template file ${templateFile}`);
                         return;
                     }
                     
                     let cmd = InterfaceBuilder.build(data, paramsMap as ParamsMap);
                     if (cmd === null) {
-                        window.showErrorMessage(`can't parse rule file ${templateFile}`);
+                        vscode.window.showErrorMessage(`can't parse rule file ${templateFile}`);
                         return;
                     }
                
@@ -102,19 +102,19 @@ export function activate(context: ExtensionContext) {
     
                         fs.writeFile(cmdFile, cmd, 'utf8', (err) => {
                             if (err !== null) {
-                                window.showErrorMessage(`can't write command file ${cmdFile}`);
+                                vscode.window.showErrorMessage(`can't write command file ${cmdFile}`);
                                 return;
                             }
     
-                            return workspace.openTextDocument(cmdFile).then(doc => {
+                            return vscode.workspace.openTextDocument(cmdFile).then(doc => {
                                 if (doc === undefined) {
-                                    window.showErrorMessage(`something went wrong opening ${cmdFile}`);
+                                    vscode.window.showErrorMessage(`something went wrong opening ${cmdFile}`);
                                     return;
                                 }
     
                                 // Remember cmd file
                                 _cmdFiles.set(paramsFsPath, cmdFile);
-                                window.showTextDocument(doc, column);
+                                vscode.window.showTextDocument(doc, column);
                             });
                         });
                     });
@@ -122,6 +122,57 @@ export function activate(context: ExtensionContext) {
             });
         });
     });
+
+    function replaceParams(document: vscode.TextDocument, column: vscode.ViewColumn, readOnly: boolean = true) {
+        let params = new Params(document);
+        let originalUri = document.uri;
+        askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles(), 'select a parameter file to use / create ...').then((selected) => {
+            if (selected === undefined) {
+                return;
+            }
+            
+            if (!params.tryUpdateParams(selected)) {
+                vscode.window.showInformationMessage(`Generating parameter value file from ${selected}\n`+
+                                                     'Please add any replacement to the value file.');
+                params.saveParams(selected).then(p => {
+                    setDefaultParamsFile(originalUri, p.fsPath);
+                    return vscode.workspace.openTextDocument(p);
+                }).then(doc => vscode.window.showTextDocument(doc, column), err => vscode.window.showErrorMessage(err));
+            } else {
+                params.saveParams(selected).then(p => setDefaultParamsFile(originalUri, p.fsPath), err => vscode.window.showErrorMessage(err));
+                const replacementUri = ReplacementProvider.getUri(params);
+    
+                if (readOnly) {
+                    vscode.workspace.openTextDocument(replacementUri)
+                        .then(doc => {
+                            replacementProvider.update(doc.uri);
+                            vscode.window.showTextDocument(doc, column);
+                        }, err => vscode.window.showErrorMessage(err));
+                } else {
+                    vscode.workspace.openTextDocument(replacementUri).then(replaced => {
+                        if (replaced === undefined || replaced === null) {
+                            vscode.window.showErrorMessage('error replacing document!');
+                            return;
+                        }
+    
+                        askForFile(replaced.uri.fsPath, null, 'save replaced file to ...').then(selected => {
+                            if (selected === undefined || selected === null) {
+                                return;
+                            }
+    
+                            return fs.writeFile(selected, replaced.getText(), 'utf8', (err) => {
+                                if (err !== null) {
+                                    vscode.window.showErrorMessage(`Error writing ${selected}: ${err}`);
+                                } else {
+                                    vscode.window.showTextDocument(vscode.Uri.file(selected));
+                                }
+                            });}, 
+                            err => vscode.window.showErrorMessage(err));
+                        });
+                }
+            }
+        });
+    }
 
     context.subscriptions.push(
         providerRegistrations,
@@ -141,16 +192,16 @@ function resolvePath(p: string): string {
 }
 
 function getDefaultTemplateUrl(): string | undefined {
-    return workspace.getConfiguration('frigg', null).get('templatesUrl');
+    return vscode.workspace.getConfiguration('frigg', null).get('templatesUrl');
 }
 
-function getDefaultTemplatesFolder(resource: Uri | undefined): string | undefined {
-    return workspace.getConfiguration('frigg', resource).get('templatesFolder');
+function getDefaultTemplatesFolder(resource: vscode.Uri | undefined): string | undefined {
+    return vscode.workspace.getConfiguration('frigg', resource).get('templatesFolder');
 }
 
-function updateTemplatesFolder(resource: Uri | undefined, value: any): Thenable<void> {
+function updateTemplatesFolder(resource: vscode.Uri | undefined, value: any): Thenable<void> {
     const sectionName = 'templatesFolder';
-    let config = workspace.getConfiguration('frigg', resource);
+    let config = vscode.workspace.getConfiguration('frigg', resource);
     let inspect = config.inspect(sectionName);
     let useGlobal = inspect === undefined || (inspect.workspaceFolderValue === undefined && inspect.workspaceValue === undefined);
     return config.update(sectionName, value, useGlobal);
@@ -165,7 +216,7 @@ function getDefaultTemplateFile(paramsFsPath: string): string | undefined {
     return _templateFiles.get(paramsFsPath);
 }
 
-function discoverTemplateFiles(resource: Uri): Thenable<string[]> {
+function discoverTemplateFiles(resource: vscode.Uri): Thenable<string[]> {
     return new Promise((resolve, reject) => {
         let templates = Array.from(_templateFiles.values());
         let templatesFolder = getDefaultTemplatesFolder(resource);
@@ -184,15 +235,15 @@ function discoverTemplateFiles(resource: Uri): Thenable<string[]> {
     });
 }
 
-function nextColumn(editor: TextEditor): number {
+function nextColumn(editor: vscode.TextEditor): number {
     return editor.viewColumn === undefined ? 1 : Math.min(editor.viewColumn + 1, 2);
 }
 
-function setDefaultParamsFile(uri: Uri, paramsFilePath: string) {
+function setDefaultParamsFile(uri: vscode.Uri, paramsFilePath: string) {
     _paramsFiles.set(uri.toString(), paramsFilePath);
 }
 
-function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
+function downloadTemplates(resource: vscode.Uri | undefined): Thenable<string[]> {
     return new Promise((resolve, reject) => {
         let url = getDefaultTemplateUrl();
         if (url === undefined) {
@@ -203,13 +254,13 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
         // Pick template folder
         let templatesFolder = getDefaultTemplatesFolder(resource);
         let opt = {
-            defaultUri: templatesFolder !== undefined ? Uri.file(templatesFolder) : undefined,
+            defaultUri: templatesFolder !== undefined ? vscode.Uri.file(templatesFolder) : undefined,
             canSelectFiles: false, 
             canSelectMany: false, 
             canSelectFolders: true 
         };
 
-        window.showOpenDialog(opt).then(selected => {
+        vscode.window.showOpenDialog(opt).then(selected => {
             if (selected === undefined || selected.length < 1) {
                 reject();
                 return;
@@ -224,7 +275,7 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
             // remember new template folder
             updateTemplatesFolder(resource, selectedFolder);
             
-            window.showQuickPick([url as string], { placeHolder: 'Download templates from ...' }).then(selected => {
+            vscode.window.showQuickPick([url as string], { placeHolder: 'Download templates from ...' }).then(selected => {
                 if (selected === undefined) {
                     reject();
                     return;
@@ -242,7 +293,7 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
                     let errors = 0;
                     let complete = function() {
                         if (completed.length + errors >= files.length) {
-                            window.showInformationMessage(`Done! ${files.length - errors} templates downloaded, ${errors} errors.`);
+                            vscode.window.showInformationMessage(`Done! ${files.length - errors} templates downloaded, ${errors} errors.`);
                             resolve(completed);
                         }
                     };
@@ -250,10 +301,10 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
                     for (let i = 0; i < files.length; ++i) {
                         let f = files[i];
                         let filePath = path.join(selectedFolder, f['name']);
-                        window.showInformationMessage(`downloading ${f['name']} ...`);
+                        vscode.window.showInformationMessage(`downloading ${f['name']} ...`);
                         makeRequest(f['download_url']).then(body => {
                             if (body === undefined || body === null) {
-                                window.showErrorMessage(`can't download ${f['name']} from: ${f['download_url']}`);
+                                vscode.window.showErrorMessage(`can't download ${f['name']} from: ${f['download_url']}`);
                                 errors++;
                                 complete();
                                 return;
@@ -261,7 +312,7 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
 
                             fs.writeFile(filePath, body, 'utf8', err => {
                                 if (err !== null) {
-                                    window.showErrorMessage(`can't write template file ${filePath}: ${err}`);
+                                    vscode.window.showErrorMessage(`can't write template file ${filePath}: ${err}`);
                                     complete();
                                     return;
                                 }
@@ -277,60 +328,12 @@ function downloadTemplates(resource: Uri | undefined): Thenable<string[]> {
     });
 }
 
-
-function replaceParams(document: TextDocument, column: ViewColumn, readOnly: boolean = true) {
-    let params = new Params(document);
-    let originalUri = document.uri;
-    askForFile(getDefaultParamsFile(params), params.discoverParamatersFiles(), 'select a parameter file to use / create ...').then((selected) => {
-        if (selected === undefined) {
-            return;
-        }
-        
-        if (!params.tryUpdateParams(selected)) {
-            window.showInformationMessage(`Generating parameter value file from ${selected}\n`+
-                                          'Please add any replacement to the value file.');
-            params.saveParams(selected).then(p => {
-                setDefaultParamsFile(originalUri, p.fsPath);
-                return workspace.openTextDocument(p);
-            }).then(doc => window.showTextDocument(doc, column), err => window.showErrorMessage(err));
-        } else {
-            params.saveParams(selected).then(p => setDefaultParamsFile(originalUri, p.fsPath), err => window.showErrorMessage(err));
-            const replacementUri = ReplacementProvider.getUri(params);
-
-            if (readOnly) {
-                workspace.openTextDocument(replacementUri).then(doc => window.showTextDocument(doc, column), err => window.showErrorMessage(err));
-            } else {
-                workspace.openTextDocument(replacementUri).then(replaced => {
-                    if (replaced === undefined || replaced === null) {
-                        window.showErrorMessage('error replacing document!');
-                        return;
-                    }
-
-                    askForFile(replaced.uri.fsPath, null, 'save replaced file to ...').then(selected => {
-                        if (selected === undefined || selected === null) {
-                            return;
-                        }
-
-                        return fs.writeFile(selected, replaced.getText(), 'utf8', (err) => {
-                            if (err !== null) {
-                                window.showErrorMessage(`Error writing ${selected}: ${err}`);
-                            } else {
-                                window.showTextDocument(Uri.file(selected));
-                            }
-                        });}, 
-                        err => window.showErrorMessage(err));
-                    });
-            }
-        }
-    });
-}
-
 function askForFile(defaultFile: string | undefined,
                     files: Thenable<string[] | undefined> | null,
                     placeHolder: string,
                     overWritePick: boolean = true): Thenable<string|undefined> {
     
-    let qpo: QuickPickOptions = {
+    let qpo: vscode.QuickPickOptions = {
         placeHolder: placeHolder,
         matchOnDescription: true,
     };
@@ -346,24 +349,24 @@ function askForFile(defaultFile: string | undefined,
         });
     }
 
-    return window.showQuickPick(options, qpo).then(selected => {
+    return vscode.window.showQuickPick(options, qpo).then(selected => {
         if (selected && selected !== undefined) {
             if (selected === shouldOpenDialog) {
                 let dialogOptions = { 
-                    defaultUri: defaultFile !== undefined ? Uri.file(defaultFile) : undefined,
+                    defaultUri: defaultFile !== undefined ? vscode.Uri.file(defaultFile) : undefined,
                     canSelectFiles: false,
                     canSelectFolders: false,
                     canSelectMany: false
                 };
 
                 if (overWritePick) {
-                    return window.showSaveDialog(dialogOptions).then(selectedUri => {
+                    return vscode.window.showSaveDialog(dialogOptions).then(selectedUri => {
                         if (selectedUri !== undefined) {
                             return selectedUri.fsPath;
                         }
                     });
                 } else {
-                    return window.showOpenDialog(dialogOptions).then(selectedUris => {
+                    return vscode.window.showOpenDialog(dialogOptions).then(selectedUris => {
                         if (selectedUris !== undefined && selectedUris.length === 1) {
                             return selectedUris[0].fsPath;
                         }
@@ -388,10 +391,10 @@ function makeRequest(url: string): Thenable<string> {
 
         request(ro, (error: any | null, response: any|null, body: any|null) => {
             if (error !== null) {
-                window.showErrorMessage(`error fetching "${ro.url}": ${error}`);
+                vscode.window.showErrorMessage(`error fetching "${ro.url}": ${error}`);
                 reject(error);
             } else if (response === null || response.statusCode !== 200) {
-                window.showErrorMessage(`wrong response for "${ro.url}": ${response.statusCode}\n${JSON.stringify(response)}`);
+                vscode.window.showErrorMessage(`wrong response for "${ro.url}": ${response.statusCode}\n${JSON.stringify(response)}`);
                 reject(response);
             } else {
                 resolve(body);

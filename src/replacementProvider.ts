@@ -7,6 +7,16 @@ import { replaceAll } from './utils';
 
 export default class ReplacementProvider implements vscode.TextDocumentContentProvider {
     static scheme = 'frigg';
+    
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+        return this._onDidChange.event;
+    }
+
+    public update(uri: vscode.Uri) {
+        this._onDidChange.fire(uri);
+    }
 
     public provideTextDocumentContent(uri: vscode.Uri): string {
         let [paramsMap, paramsFile] = decodeParams(uri);
@@ -39,7 +49,7 @@ export default class ReplacementProvider implements vscode.TextDocumentContentPr
             header += `// ${key}: ${value === '' ? '-- NOTHING --' : value}\n`;
             replaced = replaceAll(replaced, key, value);
         }
-
+        
         return `${header}\n${replaced}`;
     }
 }
