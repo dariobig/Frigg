@@ -148,8 +148,9 @@ export class Param {
     public static merge(first: Param, second: Param): Param {
         let merged: any = first;
         let other: any = second;
+        let defaultParam: any = Param.defaultParam;
         for (let k in other) {
-            if (other[k] !== '' || !(k in merged)) {
+            if (!(k in defaultParam) || (typeof other[k] === typeof defaultParam[k] && other[k] !== defaultParam[k])) {
                 merged[k] = other[k];
             }
         }
@@ -181,7 +182,7 @@ export function validateParamsMap(obj: any): ParamsMap | null {
 function mergeParams(original: ParamsMap, other: ParamsMap, deleteMissing: boolean = true): ParamsMap {
     let merged: ParamsMap = {};
     for (let key in original) {
-        merged[key] = Param.merge(original[key], Param.wrap(other[key]));
+        merged[key] = Param.merge(Param.wrap(original[key]), Param.wrap(other[key]));
     }
 
     if (!deleteMissing) {
