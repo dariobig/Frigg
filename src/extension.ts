@@ -155,7 +155,12 @@ export function activate(context: vscode.ExtensionContext) {
                             return;
                         }
     
-                        askForFile(replaced.uri.fsPath, null, 'save replaced file to ...').then(selected => {
+                        let outputPath = getDefaultReplacementOutputFile(params, replaced.uri.fsPath);
+                        let options: Thenable<string[]|undefined> = new Promise((resolve, reject) => {
+                            resolve(outputPath !== replaced.uri.fsPath ? [outputPath, replaced.uri.fsPath] : undefined);
+                        });
+
+                        askForFile(outputPath, options, 'save replaced file to ...').then(selected => {
                             if (selected === undefined || selected === null) {
                                 return;
                             }
@@ -165,6 +170,7 @@ export function activate(context: vscode.ExtensionContext) {
                                     vscode.window.showErrorMessage(`Error writing ${selected}: ${err}`);
                                 } else {
                                     vscode.window.showTextDocument(vscode.Uri.file(selected));
+                                    setDefaultReplacementOutputFile(params, selected);
                                 }
                             });}, 
                             err => vscode.window.showErrorMessage(err));
@@ -186,6 +192,7 @@ export function activate(context: vscode.ExtensionContext) {
 const _paramsFiles = new Map<string, string>();
 const _templateFiles = new Map<string, string>();
 const _cmdFiles = new Map<string, string>();
+const _replacedOutputFiles = new Map<string, string>();
 
 function resolvePath(p: string): string {
     return p.startsWith('~') ? path.join(homedir(), path.normalize(p.replace(/^~[\/\\]/, ''))) : path.normalize(p);
@@ -210,6 +217,15 @@ function updateTemplatesFolder(resource: vscode.Uri | undefined, value: any): Th
 function getDefaultParamsFile(params: Params): string {
     let d = _paramsFiles.get(params.original.toString());
     return d === undefined ? params.defaultParametersPath() : d;
+}
+
+function getDefaultReplacementOutputFile(params: Params, orDefault: string): string {
+    let found = _replacedOutputFiles.get(params.original.toString());
+    return found !== undefined ? found : orDefault;
+}
+
+function setDefaultReplacementOutputFile(params: Params, fsPath: string) {
+    _replacedOutputFiles.set(params.original.toString(), fsPath);
 }
 
 function getDefaultTemplateFile(paramsFsPath: string): string | undefined {
@@ -408,4 +424,5 @@ export function deactivate() {
     _paramsFiles.clear();
     _templateFiles.clear();
     _cmdFiles.clear();
+    _replacedOutputFiles.clear();
 }

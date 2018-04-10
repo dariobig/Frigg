@@ -3,6 +3,11 @@ All notable changes to the "frigg" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## 0.2.0 - 2018-04-10
+
+### Added
+- remembers replacemente output file
+
 ## 0.1.8 - 2018-04-05
 
 ### Fixed

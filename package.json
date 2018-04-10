@@ -2,7 +2,7 @@
     "name": "frigg",
     "displayName": "FriGG",
     "description": "Parmetrize your scripts via pre-processor replacement.",
-    "version": "0.1.9",
+    "version": "0.2.0",
     "publisher": "bigonazzi",
     "license": "Apache-2.0",
     "engines": {
