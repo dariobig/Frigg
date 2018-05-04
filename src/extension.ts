@@ -344,6 +344,14 @@ function downloadTemplates(resource: vscode.Uri | undefined): Thenable<string[]>
     });
 }
 
+function quickPickFile(f: string): vscode.QuickPickItem {
+    let p = path.parse(f as string);
+    return {
+        label: p.base,
+        detail: f,
+    } as vscode.QuickPickItem;
+}
+
 function askForFile(defaultFile: string | undefined,
                     files: Thenable<string[] | undefined> | null,
                     placeHolder: string,
@@ -354,14 +362,15 @@ function askForFile(defaultFile: string | undefined,
         matchOnDescription: true,
     };
     
-    let shouldOpenDialog = 'pick a file ...';
-    let options: Thenable<string[]> | string[];
+    let shouldOpenDialog = { label: 'pick a file ...' } as vscode.QuickPickItem;
+
+    let options: Thenable<vscode.QuickPickItem[]> | vscode.QuickPickItem[];
     if (files === null) {
-        options = defaultFile === undefined ? [shouldOpenDialog] : [defaultFile, shouldOpenDialog];
+        options = (defaultFile === undefined ? [shouldOpenDialog] : [quickPickFile(defaultFile), shouldOpenDialog]);
     } else {
         options = files.then((files) => {
-            files = (files === undefined ? [] : files).filter(f => f !== defaultFile).concat([shouldOpenDialog]);
-            return defaultFile === undefined ? files : [defaultFile].concat(files);
+            let opts = (files === undefined ? [] : files).filter(f => f !== defaultFile).map(f => quickPickFile(f)).concat([shouldOpenDialog]);
+            return defaultFile === undefined ? opts : [quickPickFile(defaultFile)].concat(opts);
         });
     }
 
@@ -389,7 +398,7 @@ function askForFile(defaultFile: string | undefined,
                     });
                 }
             } else {
-                return new Promise((resolve, reject) => resolve(selected));
+                return new Promise((resolve, reject) => resolve(selected.description));
             }
         }
         return new Promise((resolve, reject) => reject());
