@@ -398,7 +398,7 @@ function askForFile(defaultFile: string | undefined,
                     });
                 }
             } else {
-                return new Promise((resolve, reject) => resolve(selected.description));
+                return new Promise((resolve, reject) => resolve(selected.detail as string));
             }
         }
         return new Promise((resolve, reject) => reject());
